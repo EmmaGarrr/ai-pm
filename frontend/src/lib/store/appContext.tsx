@@ -68,6 +68,7 @@ interface AppState {
   chatLoading: boolean;
   typingUsers: string[];
   aiProcessingStatus: Record<string, boolean>;
+  aiProcessingStage: 'idle' | 'thinking' | 'analyzing' | 'generating' | 'error' | 'completed';
   
   // System state
   status: string;
@@ -107,6 +108,7 @@ type AppAction =
   | { type: 'SET_CHAT_LOADING'; payload: boolean }
   | { type: 'SET_TYPING_USERS'; payload: string[] }
   | { type: 'SET_AI_PROCESSING_STATUS'; payload: Record<string, boolean> }
+  | { type: 'SET_AI_PROCESSING_STAGE'; payload: 'idle' | 'thinking' | 'analyzing' | 'generating' | 'error' | 'completed' }
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'UPDATE_MESSAGE'; payload: Message }
   | { type: 'UPDATE_MESSAGE_STATUS'; payload: { messageId: string; status: MessageStatus } }
@@ -195,6 +197,7 @@ const initialState: AppState = {
   chatLoading: false,
   typingUsers: [],
   aiProcessingStatus: {},
+  aiProcessingStage: 'idle',
   
   // System state
   status: 'healthy',
@@ -348,15 +351,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_AI_PROCESSING_STATUS':
       return { ...state, aiProcessingStatus: action.payload };
     
+    case 'SET_AI_PROCESSING_STAGE':
+      return { ...state, aiProcessingStage: action.payload };
+    
     case 'ADD_MESSAGE':
       return { ...state, messages: [...state.messages, action.payload] };
     
     case 'UPDATE_MESSAGE':
+      console.log('UPDATE_MESSAGE action received:', action.payload);
+      console.log('Current messages:', state.messages.map(m => ({ id: m.id, content: m.content.substring(0, 50) })));
+      const updatedMessages = state.messages.map(m =>
+        m.id === action.payload.id ? action.payload : m
+      );
+      console.log('Updated messages:', updatedMessages.map(m => ({ id: m.id, content: m.content.substring(0, 50) })));
       return {
         ...state,
-        messages: state.messages.map(m =>
-          m.id === action.payload.id ? action.payload : m
-        ),
+        messages: updatedMessages,
       };
     
     case 'UPDATE_MESSAGE_STATUS':
@@ -678,6 +688,8 @@ export function useChatStore() {
     setChatLoading: (loading: boolean) => dispatch({ type: 'SET_CHAT_LOADING', payload: loading }),
     setTypingUsers: (users: string[]) => dispatch({ type: 'SET_TYPING_USERS', payload: users }),
     setAiProcessingStatus: (status: Record<string, boolean>) => dispatch({ type: 'SET_AI_PROCESSING_STATUS', payload: status }),
+    setAiProcessingStage: (stage: 'idle' | 'thinking' | 'analyzing' | 'generating' | 'error' | 'completed') => dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: stage }),
+    clearAiProcessingStatus: () => dispatch({ type: 'SET_AI_PROCESSING_STATUS', payload: {} }),
     addMessage: (message: Message) => dispatch({ type: 'ADD_MESSAGE', payload: message }),
     updateMessage: (message: Message) => dispatch({ type: 'UPDATE_MESSAGE', payload: message }),
     deleteMessage: (messageId: string) => dispatch({ type: 'DELETE_MESSAGE', payload: messageId }),
@@ -743,8 +755,6 @@ export function useChatStore() {
     
     sendMessage: async (message: Partial<Message>) => {
       try {
-        dispatch({ type: 'SET_CHAT_LOADING', payload: true });
-        
         const currentProjectId = state.currentProject?.id;
         const currentSessionId = state.currentSession?.id;
         
@@ -759,6 +769,9 @@ export function useChatStore() {
         if (!message.content) {
           throw new Error('Message content is required');
         }
+        
+        // Set AI processing stage to thinking immediately
+        dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'thinking' });
         
         // Add user message to local state immediately
         const userMessage: Message = {
@@ -778,6 +791,36 @@ export function useChatStore() {
         
         dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
         
+        // Add placeholder AI message with loading state
+        const aiPlaceholderMessage: Message = {
+          id: `ai_temp_${Date.now()}`,
+          sessionId: currentSessionId,
+          userId: 'ai_pm',
+          content: '',
+          type: MessageType.AI,
+          status: MessageStatus.SENDING,
+          metadata: {},
+          isEdited: false,
+          reactions: [],
+          attachments: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        
+        dispatch({ type: 'ADD_MESSAGE', payload: aiPlaceholderMessage });
+        
+        // Set AI processing status for the placeholder message
+        dispatch({ 
+          type: 'SET_AI_PROCESSING_STATUS', 
+          payload: { ...state.aiProcessingStatus, [aiPlaceholderMessage.id]: true }
+        });
+        
+        // Update to analyzing stage
+        dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'analyzing' });
+        
+        // Small delay to show the thinking stage
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Call the AI processing endpoint
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/process`, {
           method: 'POST',
@@ -793,21 +836,53 @@ export function useChatStore() {
           }),
         });
         
+        // Update to generating stage
+        dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'generating' });
+        
         if (!response.ok) {
-          // Update message status to failed
+          // Update user message status to failed
           dispatch({ 
             type: 'UPDATE_MESSAGE_STATUS', 
             payload: { messageId: userMessage.id, status: MessageStatus.FAILED }
           });
+          
+          // Update AI placeholder to show error
+          dispatch({ 
+            type: 'UPDATE_MESSAGE', 
+            payload: { 
+              ...aiPlaceholderMessage,
+              status: MessageStatus.FAILED,
+              content: 'Failed to generate response. Please try again.',
+            }
+          });
+          
+          // Set AI processing stage to error
+          dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'error' });
+          
+          // Clear AI processing status for the placeholder message
+          const updatedStatus = { ...state.aiProcessingStatus };
+          delete updatedStatus[aiPlaceholderMessage.id];
+          dispatch({ 
+            type: 'SET_AI_PROCESSING_STATUS', 
+            payload: updatedStatus
+          });
+          
+          // Reset AI processing stage after a delay
+          setTimeout(() => {
+            dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'idle' });
+          }, 3000);
+          
           throw new Error('Failed to send message');
         }
         
         const data = await response.json();
         
-        // Update user message status to delivered
+        console.log('AI Response from backend:', data);
+        
+        // Update user message status to sent
         dispatch({ 
           type: 'UPDATE_MESSAGE_STATUS', 
-          payload: { messageId: userMessage.id, status: MessageStatus.DELIVERED }
+          payload: { messageId: userMessage.id, status: MessageStatus.SENT }
         });
         
         // Add AI response if successful
@@ -818,7 +893,7 @@ export function useChatStore() {
             userId: 'ai_pm',
             content: `**User Explanation:**\n${data.ai_response.user_explanation}\n\n**Technical Instruction:**\n${data.ai_response.technical_instruction}`,
             type: MessageType.AI,
-            status: MessageStatus.DELIVERED,
+            status: MessageStatus.SENT,
             metadata: {
               confidence: data.ai_response.confidence,
               processingTime: data.ai_response.metadata?.processing_time,
@@ -836,7 +911,47 @@ export function useChatStore() {
             updatedAt: new Date(data.ai_response.timestamp),
           };
           
-          dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          // Update placeholder AI message with actual response content (keep the same ID)
+          const updatedMessage = {
+            ...aiPlaceholderMessage,
+            content: `**User Explanation:**\n${data.ai_response.user_explanation}\n\n**Technical Instruction:**\n${data.ai_response.technical_instruction}`,
+            status: MessageStatus.SENT,
+            metadata: {
+              confidence: data.ai_response.confidence,
+              processingTime: data.ai_response.metadata?.processing_time,
+              instructions: data.ai_response.technical_instruction,
+              summary: data.ai_response.user_explanation,
+              model: data.ai_response.metadata?.model_info?.model_name,
+              verificationRequired: data.ai_response.confidence < 0.7,
+              relatedIssues: data.ai_response.metadata?.memory_keys,
+              dependencies: data.ai_response.metadata?.dependencies,
+            },
+            createdAt: new Date(data.ai_response.timestamp),
+            updatedAt: new Date(data.ai_response.timestamp),
+          };
+          
+          console.log('Updating AI message with:', updatedMessage);
+          console.log('Current messages before update:', state.messages.length);
+          console.log('Placeholder message ID:', aiPlaceholderMessage.id);
+          console.log('Looking for message with ID:', aiPlaceholderMessage.id);
+          
+          dispatch({ 
+            type: 'UPDATE_MESSAGE', 
+            payload: updatedMessage
+          });
+          
+          // Set AI processing stage to completed
+          dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'completed' });
+          
+          // Clear AI processing status for the placeholder message
+          const updatedStatus = { ...state.aiProcessingStatus };
+          delete updatedStatus[aiPlaceholderMessage.id];
+          dispatch({ 
+            type: 'SET_AI_PROCESSING_STATUS', 
+            payload: updatedStatus
+          });
+          
+          console.log('Updated AI message, new stage:', 'completed');
           
           // Show notification for low confidence responses
           if (data.ai_response.confidence < 0.7) {
@@ -861,14 +976,18 @@ export function useChatStore() {
               }
             });
           }
+          
+          // Reset AI processing stage after a short delay
+          setTimeout(() => {
+            console.log('Resetting AI processing stage to idle after timeout');
+            dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'idle' });
+          }, 1500);
         }
         
         return data;
       } catch (error) {
         dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error : new Error('Failed to send message') });
         throw error;
-      } finally {
-        dispatch({ type: 'SET_CHAT_LOADING', payload: false });
       }
     },
 

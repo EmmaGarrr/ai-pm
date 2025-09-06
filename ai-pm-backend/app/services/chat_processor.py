@@ -193,15 +193,16 @@ class ChatProcessor(BaseService):
                 await self._emit_message_stored(ai_message)
             
             # Store context memories if suggested
-            if ai_response.metadata.memory_keys:
-                for key in ai_response.metadata.memory_keys:
+            memory_keys = ai_response.get('metadata', {}).get('memory_keys', [])
+            if memory_keys:
+                for key in memory_keys:
                     memory_data = {
                         'type': 'context',
                         'key': key,
                         'value': {
                             'user_input': request.user_message,
-                            'ai_response': ai_response.dict(),
-                            'context_analysis': context_analysis.dict()
+                            'ai_response': ai_response,
+                            'context_analysis': context_analysis.dict() if hasattr(context_analysis, 'dict') else context_analysis
                         },
                         'timestamp': datetime.utcnow().isoformat()
                     }
@@ -218,13 +219,16 @@ class ChatProcessor(BaseService):
     async def _store_message(self, message: ChatMessage) -> bool:
         """Store a single message in memory"""
         try:
+            from ..models.memory import MemoryCreate, MessageType
+            
             memory_key = f"message_{message.id}"
-            return await self.redis_service.store_memory(
-                project_id=message.project_id,
+            memory_data = MemoryCreate(
                 key=memory_key,
                 value=message.dict(),
-                memory_type="message"
+                type=MessageType.CONTEXT,  # Use CONTEXT instead of MESSAGE
+                project_id=message.project_id
             )
+            return await self.redis_service.store_memory(memory_data)
         except Exception as e:
             logger.error(f"Error storing message: {e}")
             return False
@@ -232,13 +236,17 @@ class ChatProcessor(BaseService):
     async def _update_chat_session(self, session_id: str, request: ChatProcessingRequest, ai_response: AIResponse) -> bool:
         """Update chat session with new messages"""
         try:
+            from ..models.memory import MemoryCreate, MemoryRecall, MessageType
+            
             # Get existing session or create new one
             session_key = f"session_{session_id}"
-            existing_session = await self.redis_service.recall_memory(
-                request.project_id,
-                session_key,
-                ["session"]
+            recall_data = MemoryRecall(
+                project_id=request.project_id,
+                query=session_key,
+                memory_types=[MessageType.CONTEXT]  # Use CONTEXT instead of SESSION
             )
+            
+            existing_session = await self.redis_service.recall_memory(recall_data)
             
             if existing_session:
                 session_data = existing_session[0]['value']
@@ -260,7 +268,7 @@ class ChatProcessor(BaseService):
             ai_message = ChatMessage(
                 project_id=request.project_id,
                 role="ai_pm",
-                content=f"User Explanation: {ai_response.user_explanation}\n\nTechnical Instruction: {ai_response.technical_instruction}",
+                content=f"User Explanation: {ai_response.get('user_explanation', '')}\n\nTechnical Instruction: {ai_response.get('technical_instruction', '')}",
                 ai_response=ai_response
             )
             
@@ -268,12 +276,14 @@ class ChatProcessor(BaseService):
             session.updated_at = datetime.utcnow()
             
             # Store updated session
-            return await self.redis_service.store_memory(
-                project_id=request.project_id,
+            memory_data = MemoryCreate(
                 key=session_key,
                 value=session.dict(),
-                memory_type="session"
+                type=MessageType.CONTEXT,  # Use CONTEXT instead of SESSION
+                project_id=request.project_id
             )
+            
+            return await self.redis_service.store_memory(memory_data)
             
         except Exception as e:
             logger.error(f"Error updating chat session: {e}")
@@ -491,8 +501,13 @@ class ChatProcessor(BaseService):
             
             for message in all_messages:
                 if message.ai_response:
-                    confidences.append(message.ai_response.confidence)
-                    processing_times.append(message.ai_response.metadata.processing_time)
+                    # Handle both dict and object cases
+                    if isinstance(message.ai_response, dict):
+                        confidences.append(message.ai_response.get('confidence', 0.5))
+                        processing_times.append(message.ai_response.get('metadata', {}).get('processing_time', 0))
+                    else:
+                        confidences.append(message.ai_response.confidence)
+                        processing_times.append(message.ai_response.metadata.processing_time)
             
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
             avg_processing_time = sum(processing_times) / len(processing_times) if processing_times else 0.0

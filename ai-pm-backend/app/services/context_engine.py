@@ -366,18 +366,35 @@ class ContextEngine(BaseService):
     async def store_context_memory(self, project_id: str, memory_data: Dict[str, Any]) -> bool:
         """Store a context memory item"""
         try:
+            from ..models.memory import MemoryCreate, MessageType
+            
             # Add timestamp and relevance info
             memory_data['timestamp'] = datetime.utcnow().isoformat()
             memory_data['relevance_score'] = 1.0  # New memories start with high relevance
             
             # Store in Redis
             memory_key = f"context_{memory_data.get('type', 'general')}_{datetime.utcnow().timestamp()}"
-            success = await self.redis_service.store_memory(
-                project_id=project_id,
+            
+            # Determine memory type
+            memory_type_str = memory_data.get('type', 'context')
+            memory_type = MessageType.CONTEXT  # Default to CONTEXT
+            
+            # Map string types to enum values
+            if memory_type_str == 'error':
+                memory_type = MessageType.ERROR
+            elif memory_type_str == 'solution':
+                memory_type = MessageType.SOLUTION
+            elif memory_type_str == 'dependency':
+                memory_type = MessageType.DEPENDENCY
+            
+            memory_create_data = MemoryCreate(
                 key=memory_key,
                 value=memory_data,
-                memory_type=memory_data.get('type', 'context')
+                type=memory_type,
+                project_id=project_id
             )
+            
+            success = await self.redis_service.store_memory(memory_create_data)
             
             if success:
                 logger.info(f"Stored context memory for project {project_id}")
