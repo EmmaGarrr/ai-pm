@@ -1,25 +1,16 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-
-// User types
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-  preferences: {
-    theme: 'light' | 'dark' | 'system';
-    notifications: {
-      email: boolean;
-      push: boolean;
-      desktop: boolean;
-    };
-    language: string;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { 
+  User, 
+  Project, 
+  ChatSession, 
+  Message, 
+  MessageType, 
+  MessageStatus,
+  UserPreferences,
+  NotificationSettings
+} from '../types';
 
 interface LoginCredentials {
   email: string;
@@ -42,58 +33,7 @@ interface Session {
   isAuthenticated: boolean;
 }
 
-// Project types
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
-  team: string[];
-  tags: string[];
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  progress: number;
-  estimatedHours: number;
-  actualHours: number;
-  budget?: number;
-  notes?: string;
-  isArchived: boolean;
-}
 
-// Chat types
-interface ChatSession {
-  id: string;
-  projectId: string;
-  title: string;
-  description?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  messageCount: number;
-  lastMessage?: {
-    content: string;
-    timestamp: Date;
-    sender: 'user' | 'ai';
-  };
-}
-
-interface Message {
-  id: string;
-  sessionId: string;
-  content: string;
-  type: 'user' | 'ai' | 'system';
-  sender: 'user' | 'ai' | 'system';
-  timestamp: Date;
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
-  metadata?: {
-    confidence?: number;
-    instructions?: string;
-    summary?: string;
-    files?: string[];
-    links?: string[];
-  };
-}
 
 // Combined store state
 interface AppState {
@@ -128,6 +68,9 @@ interface AppState {
   chatLoading: boolean;
   typingUsers: string[];
   aiProcessingStatus: Record<string, boolean>;
+  
+  // System state
+  status: string;
 }
 
 type AppAction =
@@ -141,6 +84,7 @@ type AppAction =
   | { type: 'SET_NOTIFICATIONS'; payload: Partial<AppState['notifications']> }
   | { type: 'TOGGLE_DEBUG_MODE' }
   | { type: 'SET_APP_VERSION'; payload: string }
+  | { type: 'SET_SYSTEM_STATUS'; payload: string }
   
   // User actions
   | { type: 'SET_USER'; payload: User | null }
@@ -165,6 +109,7 @@ type AppAction =
   | { type: 'SET_AI_PROCESSING_STATUS'; payload: Record<string, boolean> }
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'UPDATE_MESSAGE'; payload: Message }
+  | { type: 'UPDATE_MESSAGE_STATUS'; payload: { messageId: string; status: MessageStatus } }
   | { type: 'DELETE_MESSAGE'; payload: string }
   | { type: 'ADD_SESSION'; payload: ChatSession }
   | { type: 'UPDATE_SESSION'; payload: ChatSession }
@@ -179,7 +124,8 @@ const initialState: AppState = {
   theme: 'system',
   notifications: {
     enabled: true,
-        desktop: false,
+    sound: true,
+    desktop: false,
   },
   debugMode: false,
   appVersion: '1.0.0',
@@ -190,22 +136,22 @@ const initialState: AppState = {
     email: 'dev@example.com',
     name: 'Developer User',
     avatar: undefined,
-    role: 'developer',
     preferences: {
       theme: 'system',
       notifications: {
         email: true,
         push: true,
         desktop: true,
-              },
+        sound: true,
+      },
       language: 'en',
       timezone: 'UTC',
       dateFormat: 'MM/DD/YYYY',
     },
-    createdAt: new Date(),
-    updatedAt: new Date(),
     isActive: true,
     lastLoginAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
   },
   session: {
     user: {
@@ -213,22 +159,22 @@ const initialState: AppState = {
       email: 'dev@example.com',
       name: 'Developer User',
       avatar: undefined,
-      role: 'developer',
       preferences: {
         theme: 'system',
         notifications: {
           email: true,
           push: true,
           desktop: true,
+          sound: true,
         },
         language: 'en',
         timezone: 'UTC',
         dateFormat: 'MM/DD/YYYY',
       },
-      createdAt: new Date(),
-      updatedAt: new Date(),
       isActive: true,
       lastLoginAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     token: 'dev-token-123',
     refreshToken: 'dev-refresh-token-123',
@@ -287,6 +233,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_APP_VERSION':
       return { ...state, appVersion: action.payload };
     
+    case 'SET_SYSTEM_STATUS':
+      return { ...state, status: action.payload };
+    
     // User actions
     case 'SET_USER':
       return { ...state, user: action.payload };
@@ -305,13 +254,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
           email: 'dev@example.com',
           name: 'Developer User',
           avatar: undefined,
-          role: 'developer',
           preferences: {
             theme: 'system',
             notifications: {
               email: true,
               push: true,
               desktop: true,
+              sound: true,
                           },
             language: 'en',
             timezone: 'UTC',
@@ -328,13 +277,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
             email: 'dev@example.com',
             name: 'Developer User',
             avatar: undefined,
-            role: 'developer',
             preferences: {
               theme: 'system',
               notifications: {
                 email: true,
                 push: true,
                 desktop: true,
+                sound: true,
                               },
               language: 'en',
               timezone: 'UTC',
@@ -407,6 +356,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         messages: state.messages.map(m =>
           m.id === action.payload.id ? action.payload : m
+        ),
+      };
+    
+    case 'UPDATE_MESSAGE_STATUS':
+      return {
+        ...state,
+        messages: state.messages.map(m =>
+          m.id === action.payload.messageId ? { ...m, status: action.payload.status } : m
         ),
       };
     
@@ -731,13 +688,188 @@ export function useChatStore() {
     
     // Helper methods
     fetchMessages: async (sessionId: string) => {
-      // TODO: Implement actual message fetching
-      throw new Error('Message fetching not implemented');
+      try {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: true });
+        
+        const currentProjectId = state.currentProject?.id;
+        if (!currentProjectId) {
+          throw new Error('No project selected');
+        }
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/history/${currentProjectId}?session_id=${sessionId}&limit=50`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch messages');
+        }
+        
+        const messages = await response.json();
+        
+        // Transform backend messages to frontend format
+        const transformedMessages: Message[] = messages.map((msg: any) => ({
+          id: msg.id,
+          sessionId: sessionId,
+          userId: state.user?.id || 'system',
+          content: msg.content,
+          type: msg.role === 'ai_pm' ? MessageType.AI : MessageType.USER,
+          status: MessageStatus.DELIVERED,
+          metadata: {
+            confidence: msg.ai_response?.confidence,
+            processingTime: msg.ai_response?.metadata?.processing_time,
+            instructions: msg.ai_response?.technical_instruction,
+            summary: msg.ai_response?.user_explanation,
+            model: msg.ai_response?.metadata?.model_info?.model_name,
+            verificationRequired: (msg.ai_response?.confidence || 1) < 0.7,
+          },
+          createdAt: new Date(msg.timestamp),
+          updatedAt: new Date(msg.timestamp),
+          isEdited: false,
+          reactions: [],
+        }));
+        
+        dispatch({ type: 'SET_MESSAGES', payload: transformedMessages });
+        return transformedMessages;
+      } catch (error) {
+        dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error : new Error('Failed to fetch messages') });
+        throw error;
+      } finally {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: false });
+      }
     },
     
     sendMessage: async (message: Partial<Message>) => {
-      // TODO: Implement actual message sending
-      throw new Error('Message sending not implemented');
+      try {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: true });
+        
+        const currentProjectId = state.currentProject?.id;
+        const currentSessionId = state.currentSession?.id;
+        
+        if (!currentProjectId) {
+          throw new Error('No project selected');
+        }
+        
+        if (!currentSessionId) {
+          throw new Error('No session selected');
+        }
+        
+        if (!message.content) {
+          throw new Error('Message content is required');
+        }
+        
+        // Add user message to local state immediately
+        const userMessage: Message = {
+          id: `temp_${Date.now()}`,
+          sessionId: currentSessionId,
+          userId: state.user?.id || 'user',
+          content: message.content,
+          type: MessageType.USER,
+          status: MessageStatus.SENDING,
+          metadata: {},
+          isEdited: false,
+          reactions: [],
+          attachments: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        
+        dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
+        
+        // Call the AI processing endpoint
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/process`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            project_id: currentProjectId,
+            session_id: currentSessionId,
+            user_message: message.content,
+            context: {},
+            require_verification: true,
+          }),
+        });
+        
+        if (!response.ok) {
+          // Update message status to failed
+          dispatch({ 
+            type: 'UPDATE_MESSAGE_STATUS', 
+            payload: { messageId: userMessage.id, status: MessageStatus.FAILED }
+          });
+          throw new Error('Failed to send message');
+        }
+        
+        const data = await response.json();
+        
+        // Update user message status to delivered
+        dispatch({ 
+          type: 'UPDATE_MESSAGE_STATUS', 
+          payload: { messageId: userMessage.id, status: MessageStatus.DELIVERED }
+        });
+        
+        // Add AI response if successful
+        if (data.success && data.ai_response) {
+          const aiMessage: Message = {
+            id: data.ai_response.id,
+            sessionId: currentSessionId,
+            userId: 'ai_pm',
+            content: `**User Explanation:**\n${data.ai_response.user_explanation}\n\n**Technical Instruction:**\n${data.ai_response.technical_instruction}`,
+            type: MessageType.AI,
+            status: MessageStatus.DELIVERED,
+            metadata: {
+              confidence: data.ai_response.confidence,
+              processingTime: data.ai_response.metadata?.processing_time,
+              instructions: data.ai_response.technical_instruction,
+              summary: data.ai_response.user_explanation,
+              model: data.ai_response.metadata?.model_info?.model_name,
+              verificationRequired: data.ai_response.confidence < 0.7,
+              relatedIssues: data.ai_response.metadata?.memory_keys,
+              dependencies: data.ai_response.metadata?.dependencies,
+            },
+            isEdited: false,
+            reactions: [],
+            attachments: [],
+            createdAt: new Date(data.ai_response.timestamp),
+            updatedAt: new Date(data.ai_response.timestamp),
+          };
+          
+          dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          
+          // Show notification for low confidence responses
+          if (data.ai_response.confidence < 0.7) {
+            dispatch({ 
+              type: 'SET_NOTIFICATION', 
+              payload: {
+                type: 'warning',
+                message: 'Low confidence response - please verify before proceeding',
+                duration: 5000,
+              }
+            });
+          }
+          
+          // Show notification if verification is required
+          if (data.verification_required && data.verification_prompt) {
+            dispatch({ 
+              type: 'SET_NOTIFICATION', 
+              payload: {
+                type: 'info',
+                message: 'Verification required for this response',
+                duration: 5000,
+              }
+            });
+          }
+        }
+        
+        return data;
+      } catch (error) {
+        dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error : new Error('Failed to send message') });
+        throw error;
+      } finally {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: false });
+      }
     },
 
     createSession: async (projectId: string, sessionData: { title: string; description?: string }) => {
@@ -770,6 +902,17 @@ export function useChatStore() {
           createdAt: new Date(newSession.created_at),
           updatedAt: new Date(newSession.created_at),
           messageCount: 0,
+          messages: [],
+          participants: [],
+          settings: {
+            autoSave: true,
+            memoryContext: true,
+            aiAssistance: true,
+            allowInvites: false,
+            isPublic: false,
+          },
+          isArchived: false,
+          lastActivityAt: new Date(newSession.created_at),
         };
         
         dispatch({ type: 'ADD_SESSION', payload: chatSession });
@@ -805,6 +948,17 @@ export function useChatStore() {
           createdAt: new Date(session.created_at),
           updatedAt: new Date(session.updated_at),
           messageCount: session.messages?.length || 0,
+          messages: session.messages || [],
+          participants: [],
+          settings: session.metadata?.settings || {
+            autoSave: true,
+            memoryContext: true,
+            aiAssistance: true,
+            allowInvites: false,
+            isPublic: false,
+          },
+          isArchived: session.isArchived || false,
+          lastActivityAt: new Date(session.updated_at),
           lastMessage: session.messages?.[0] ? {
             content: session.messages[0].content,
             timestamp: new Date(session.messages[0].timestamp),

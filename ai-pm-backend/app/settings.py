@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     cors_origins: str = "http://localhost:3000"
     
+    # AI Configuration
+    gemini_api_key: Optional[str] = None
+    gemini_model: str = "gemini-2.0-flash-001"
+    ai_temperature: float = 0.3
+    ai_max_tokens: int = 2000
+    
     # Environment
     environment: str = "development"
     log_level: str = "INFO"

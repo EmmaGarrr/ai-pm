@@ -10,6 +10,7 @@ from ..services.redis_service import RedisService
 from ..services.gemini_service import GeminiService
 from ..services.context_engine import ContextEngine
 from ..utils.logger import get_logger
+from ..settings import settings
 
 logger = get_logger(__name__)
 
@@ -23,11 +24,11 @@ async def get_chat_processor() -> ChatProcessor:
     await redis_service.connect()
     
     gemini_config = {
-        'api_key': 'your-gemini-api-key',  # This should come from config
-        'model_name': 'gemini-2.0-flash-001',
-        'temperature': 0.3,
-        'max_tokens': 2000,
-        'confidence_threshold': 0.85,
+        'api_key': settings.gemini_api_key or 'your-gemini-api-key',  # Fallback for development
+        'model_name': settings.gemini_model,
+        'temperature': settings.ai_temperature,
+        'max_tokens': settings.ai_max_tokens,
+        'confidence_threshold': settings.confidence_threshold,
         'system_prompt_path': 'app/prompts/ai_pm_system.txt'
     }
     

@@ -111,7 +111,8 @@ export enum MessageType {
   USER = 'user',
   ASSISTANT = 'assistant',
   SYSTEM = 'system',
-  ACTION = 'action'
+  ACTION = 'action',
+  AI = 'ai'
 }
 
 export enum MessageStatus {
@@ -119,9 +120,7 @@ export enum MessageStatus {
   SENT = 'sent',
   DELIVERED = 'delivered',
   READ = 'read',
-  PROCESSED = 'processed',
-  FAILED = 'failed',
-  DELETED = 'deleted'
+  FAILED = 'failed'
 }
 
 export interface MessageMetadata {

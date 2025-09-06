@@ -144,7 +144,7 @@ class ChatProcessor(BaseService):
         
         return ai_context
     
-    def _determine_verification_needed(self, ai_response: AIResponse, require_verification: bool) -> bool:
+    def _determine_verification_needed(self, ai_response: Dict[str, Any], require_verification: bool) -> bool:
         """Determine if verification is needed based on confidence and settings"""
         if not require_verification:
             return False
@@ -152,9 +152,9 @@ class ChatProcessor(BaseService):
         if not self.verification_required:
             return False
         
-        return ai_response.confidence < self.confidence_threshold
+        return ai_response.get('confidence', 1.0) < self.confidence_threshold
     
-    async def _store_chat_interaction(self, request: ChatProcessingRequest, ai_response: AIResponse, context_analysis) -> bool:
+    async def _store_chat_interaction(self, request: ChatProcessingRequest, ai_response: Dict[str, Any], context_analysis) -> bool:
         """Store chat interaction in memory"""
         try:
             # Store user message
@@ -172,13 +172,13 @@ class ChatProcessor(BaseService):
             ai_message = ChatMessage(
                 project_id=request.project_id,
                 role="ai_pm",
-                content=f"User Explanation: {ai_response.user_explanation}\n\nTechnical Instruction: {ai_response.technical_instruction}",
+                content=f"User Explanation: {ai_response.get('user_explanation', '')}\n\nTechnical Instruction: {ai_response.get('technical_instruction', '')}",
                 ai_response=ai_response,
                 metadata={
-                    'confidence': ai_response.confidence,
-                    'processing_time': ai_response.metadata.processing_time,
-                    'memory_keys': ai_response.metadata.memory_keys,
-                    'dependencies': ai_response.metadata.dependencies
+                    'confidence': ai_response.get('confidence', 0.5),
+                    'processing_time': ai_response.get('metadata', {}).get('processing_time', 0),
+                    'memory_keys': ai_response.get('metadata', {}).get('memory_keys', []),
+                    'dependencies': ai_response.get('metadata', {}).get('dependencies', [])
                 }
             )
             
@@ -279,12 +279,12 @@ class ChatProcessor(BaseService):
             logger.error(f"Error updating chat session: {e}")
             return False
     
-    async def _generate_verification_prompt(self, request: ChatProcessingRequest, ai_response: AIResponse) -> str:
+    async def _generate_verification_prompt(self, request: ChatProcessingRequest, ai_response: Dict[str, Any]) -> str:
         """Generate verification prompt for the AI response"""
         try:
             return await self.gemini_service.generate_verification_prompt(
                 request.user_message,
-                ai_response.dict()
+                ai_response
             )
         except Exception as e:
             logger.error(f"Error generating verification prompt: {e}")
@@ -594,7 +594,7 @@ class ChatProcessor(BaseService):
         except Exception as e:
             logger.error(f"Error emitting AI processing start event: {e}")
     
-    async def _emit_ai_processing_complete(self, request: ChatProcessingRequest, ai_response: AIResponse):
+    async def _emit_ai_processing_complete(self, request: ChatProcessingRequest, ai_response: Dict[str, Any]):
         """Emit AI processing complete event"""
         try:
             await self.websocket_service.broadcast_to_project(
@@ -603,9 +603,9 @@ class ChatProcessor(BaseService):
                 {
                     "stage": "ai_generation",
                     "status": "completed",
-                    "confidence": ai_response.confidence,
-                    "processing_time": ai_response.metadata.processing_time,
-                    "memory_keys": ai_response.metadata.memory_keys,
+                    "confidence": ai_response.get('confidence', 0.5),
+                    "processing_time": ai_response.get('metadata', {}).get('processing_time', 0),
+                    "memory_keys": ai_response.get('metadata', {}).get('memory_keys', []),
                     "project_id": request.project_id,
                     "timestamp": datetime.utcnow().isoformat()
                 }
@@ -630,7 +630,7 @@ class ChatProcessor(BaseService):
         except Exception as e:
             logger.error(f"Error emitting verification required event: {e}")
     
-    async def _emit_processing_complete(self, request: ChatProcessingRequest, ai_response: AIResponse, processing_time: float):
+    async def _emit_processing_complete(self, request: ChatProcessingRequest, ai_response: Dict[str, Any], processing_time: float):
         """Emit processing complete event"""
         try:
             await self.websocket_service.broadcast_to_project(
@@ -639,9 +639,9 @@ class ChatProcessor(BaseService):
                 {
                     "request_id": getattr(request, 'id', 'unknown'),
                     "success": True,
-                    "confidence": ai_response.confidence,
+                    "confidence": ai_response.get('confidence', 0.5),
                     "processing_time": processing_time,
-                    "verification_required": ai_response.confidence < self.confidence_threshold,
+                    "verification_required": ai_response.get('confidence', 1.0) < self.confidence_threshold,
                     "project_id": request.project_id,
                     "timestamp": datetime.utcnow().isoformat()
                 }

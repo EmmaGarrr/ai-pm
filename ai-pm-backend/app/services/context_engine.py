@@ -9,6 +9,7 @@ from .base_service import BaseService
 from .websocket_service import get_websocket_service
 from .status_service import get_status_service
 from ..models.ai_response import ContextAnalysis, MemoryContext
+from ..models.memory import MemoryRecall, MessageType
 from ..events.websocket_events import WebSocketEvents
 from ..utils.logger import get_logger
 
@@ -137,7 +138,13 @@ class ContextEngine(BaseService):
         """Retrieve relevant memories based on key terms and context"""
         try:
             # Get all memories for the project
-            all_memories = await self.redis_service.recall_memory(project_id, "", ["error", "solution", "context", "dependency"])
+            recall_data = MemoryRecall(
+                project_id=project_id,
+                query="",
+                memory_types=[MessageType.ERROR, MessageType.SOLUTION, MessageType.CONTEXT, MessageType.DEPENDENCY],
+                limit=100
+            )
+            all_memories = await self.redis_service.recall_memory(recall_data)
             
             # Score memories based on relevance
             scored_memories = []
@@ -416,7 +423,13 @@ class ContextEngine(BaseService):
         """Get a summary of project context"""
         try:
             # Get recent memories
-            recent_memories = await self.redis_service.recall_memory(project_id, "", ["error", "solution", "context", "dependency"])
+            recall_data = MemoryRecall(
+                project_id=project_id,
+                query="",
+                memory_types=[MessageType.ERROR, MessageType.SOLUTION, MessageType.CONTEXT, MessageType.DEPENDENCY],
+                limit=50
+            )
+            recent_memories = await self.redis_service.recall_memory(recall_data)
             
             # Analyze memory distribution
             memory_types = defaultdict(int)
