@@ -392,6 +392,13 @@ export interface CreateMemoryItemRequest {
   expiresAt?: Date;
 }
 
+export interface CreateSessionRequest {
+  projectId: string;
+  title: string;
+  description?: string;
+  settings?: SessionSettings;
+}
+
 export interface LoginCredentials {
   email: string;
   password: string;

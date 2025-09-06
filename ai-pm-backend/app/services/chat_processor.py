@@ -30,6 +30,23 @@ class ChatProcessor(BaseService):
         # Get WebSocket and status services
         self.websocket_service = get_websocket_service()
         self.status_service = get_status_service()
+    
+    async def initialize(self) -> bool:
+        """Initialize the chat processor"""
+        try:
+            await self.redis_service.connect()
+            return True
+        except Exception as e:
+            self.log_error(f"Failed to initialize chat processor: {e}")
+            return False
+    
+    async def health_check(self) -> bool:
+        """Check if chat processor is healthy"""
+        try:
+            return await self.redis_service.health_check()
+        except Exception as e:
+            self.log_error(f"Chat processor health check failed: {e}")
+            return False
         
     async def process_chat_message(self, request: ChatProcessingRequest) -> ChatProcessingResponse:
         """Process a chat message through the AI pipeline"""
@@ -385,17 +402,34 @@ class ChatProcessor(BaseService):
     
     async def get_chat_sessions(self, project_id: str) -> List[ChatSession]:
         """Get all chat sessions for a project"""
+        from datetime import datetime
+        from ..models.memory import MemoryRecall, MessageType
+        
         try:
             # Get all session memories
-            session_memories = await self.redis_service.recall_memory(project_id, "", ["session"])
+            recall_data = MemoryRecall(
+                project_id=project_id,
+                query="",
+                memory_types=[MessageType.CONTEXT],
+                limit=50
+            )
+            session_memories = await self.redis_service.recall_memory(recall_data)
             
             sessions = []
             for memory in session_memories:
                 try:
-                    session_data = memory['value']
-                    if isinstance(session_data, dict):
-                        session = ChatSession(**session_data)
-                        sessions.append(session)
+                    # Only process memories that have session keys
+                    if memory.get('key', '').startswith('session_'):
+                        session_data = memory['value']
+                        if isinstance(session_data, dict):
+                            # Parse datetime strings back to datetime objects
+                            if 'created_at' in session_data and isinstance(session_data['created_at'], str):
+                                session_data['created_at'] = datetime.fromisoformat(session_data['created_at'])
+                            if 'updated_at' in session_data and isinstance(session_data['updated_at'], str):
+                                session_data['updated_at'] = datetime.fromisoformat(session_data['updated_at'])
+                            
+                            session = ChatSession(**session_data)
+                            sessions.append(session)
                 except Exception as e:
                     logger.error(f"Error parsing session from memory: {e}")
                     continue

@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict, Any
 from ..models.ai_response import (
     ChatProcessingRequest, ChatProcessingResponse, ChatMessage, 
-    ChatSession, VerificationRequest, VerificationResponse
+    ChatSession, VerificationRequest, VerificationResponse, CreateSessionRequest
 )
+from ..models.memory import MemoryCreate, MessageType
 from ..services.chat_processor import ChatProcessor
 from ..services.redis_service import RedisService
 from ..services.gemini_service import GeminiService
@@ -194,8 +195,7 @@ async def get_chat_status(
 @router.post("/sessions/{project_id}")
 async def create_chat_session(
     project_id: str,
-    title: str,
-    processor: ChatProcessor = Depends(get_chat_processor)
+    session_data: CreateSessionRequest,
 ):
     """Create a new chat session for a project"""
     try:
@@ -205,24 +205,41 @@ async def create_chat_session(
         import uuid
         session_id = str(uuid.uuid4())
         
-        # Create session
+        # Create session with data from request
         session = ChatSession(
             id=session_id,
             project_id=project_id,
-            title=title
+            title=session_data.title,
+            messages=[],
+            metadata={
+                "description": session_data.description,
+                "settings": session_data.settings or {
+                    "autoSave": True,
+                    "memoryContext": True,
+                    "aiAssistance": True,
+                    "allowInvites": False,
+                    "isPublic": False,
+                }
+            }
         )
         
-        # Store session
-        session_key = f"session_{session_id}"
+        # Store session with consistent key pattern
         redis_service = RedisService()
         await redis_service.connect()
         
-        success = await redis_service.store_memory(
+        # Convert session to dict and handle datetime serialization
+        session_dict = session.dict()
+        session_dict['created_at'] = session_dict['created_at'].isoformat()
+        session_dict['updated_at'] = session_dict['updated_at'].isoformat()
+        
+        memory_data = MemoryCreate(
             project_id=project_id,
-            key=session_key,
-            value=session.dict(),
-            memory_type="session"
+            key=f"session_{session_id}",
+            value=session_dict,
+            type=MessageType.CONTEXT
         )
+        
+        success = await redis_service.store_memory(memory_data)
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to create session")
@@ -230,8 +247,10 @@ async def create_chat_session(
         logger.info(f"Successfully created chat session {session_id} for project {project_id}")
         return {
             "session_id": session_id,
-            "title": title,
+            "title": session_data.title,
+            "description": session_data.description,
             "created_at": session.created_at,
+            "project_id": project_id,
             "message": "Session created successfully"
         }
         

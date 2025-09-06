@@ -165,7 +165,10 @@ type AppAction =
   | { type: 'SET_AI_PROCESSING_STATUS'; payload: Record<string, boolean> }
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'UPDATE_MESSAGE'; payload: Message }
-  | { type: 'DELETE_MESSAGE'; payload: string };
+  | { type: 'DELETE_MESSAGE'; payload: string }
+  | { type: 'ADD_SESSION'; payload: ChatSession }
+  | { type: 'UPDATE_SESSION'; payload: ChatSession }
+  | { type: 'DELETE_SESSION'; payload: string };
 
 const initialState: AppState = {
   // Global state
@@ -176,20 +179,61 @@ const initialState: AppState = {
   theme: 'system',
   notifications: {
     enabled: true,
-    sound: true,
-    desktop: false,
+        desktop: false,
   },
   debugMode: false,
   appVersion: '1.0.0',
   
   // User state
-  user: null,
+  user: {
+    id: 'dev-user-1',
+    email: 'dev@example.com',
+    name: 'Developer User',
+    avatar: undefined,
+    role: 'developer',
+    preferences: {
+      theme: 'system',
+      notifications: {
+        email: true,
+        push: true,
+        desktop: true,
+              },
+      language: 'en',
+      timezone: 'UTC',
+      dateFormat: 'MM/DD/YYYY',
+    },
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isActive: true,
+    lastLoginAt: new Date(),
+  },
   session: {
-    user: null,
-    token: null,
-    refreshToken: null,
-    expiresAt: null,
-    isAuthenticated: false,
+    user: {
+      id: 'dev-user-1',
+      email: 'dev@example.com',
+      name: 'Developer User',
+      avatar: undefined,
+      role: 'developer',
+      preferences: {
+        theme: 'system',
+        notifications: {
+          email: true,
+          push: true,
+          desktop: true,
+        },
+        language: 'en',
+        timezone: 'UTC',
+        dateFormat: 'MM/DD/YYYY',
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isActive: true,
+      lastLoginAt: new Date(),
+    },
+    token: 'dev-token-123',
+    refreshToken: 'dev-refresh-token-123',
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+    isAuthenticated: true,
   },
   authLoading: false,
   
@@ -256,13 +300,55 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'CLEAR_SESSION':
       return {
         ...state,
-        user: null,
+        user: {
+          id: 'dev-user-1',
+          email: 'dev@example.com',
+          name: 'Developer User',
+          avatar: undefined,
+          role: 'developer',
+          preferences: {
+            theme: 'system',
+            notifications: {
+              email: true,
+              push: true,
+              desktop: true,
+                          },
+            language: 'en',
+            timezone: 'UTC',
+            dateFormat: 'MM/DD/YYYY',
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isActive: true,
+          lastLoginAt: new Date(),
+        },
         session: {
-          user: null,
-          token: null,
-          refreshToken: null,
-          expiresAt: null,
-          isAuthenticated: false,
+          user: {
+            id: 'dev-user-1',
+            email: 'dev@example.com',
+            name: 'Developer User',
+            avatar: undefined,
+            role: 'developer',
+            preferences: {
+              theme: 'system',
+              notifications: {
+                email: true,
+                push: true,
+                desktop: true,
+                              },
+              language: 'en',
+              timezone: 'UTC',
+              dateFormat: 'MM/DD/YYYY',
+            },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isActive: true,
+            lastLoginAt: new Date(),
+          },
+          token: 'dev-token-123',
+          refreshToken: 'dev-refresh-token-123',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          isAuthenticated: true,
         },
       };
     
@@ -328,6 +414,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         messages: state.messages.filter(m => m.id !== action.payload),
+      };
+    
+    case 'ADD_SESSION':
+      return {
+        ...state,
+        sessions: [...state.sessions, action.payload],
+      };
+    
+    case 'UPDATE_SESSION':
+      return {
+        ...state,
+        sessions: state.sessions.map(s =>
+          s.id === action.payload.id ? action.payload : s
+        ),
+        currentSession: state.currentSession?.id === action.payload.id ? action.payload : state.currentSession,
+      };
+    
+    case 'DELETE_SESSION':
+      return {
+        ...state,
+        sessions: state.sessions.filter(s => s.id !== action.payload),
+        currentSession: state.currentSession?.id === action.payload ? null : state.currentSession,
       };
     
     case 'SET_SYSTEM_STATUS':
@@ -617,6 +725,9 @@ export function useChatStore() {
     updateMessage: (message: Message) => dispatch({ type: 'UPDATE_MESSAGE', payload: message }),
     deleteMessage: (messageId: string) => dispatch({ type: 'DELETE_MESSAGE', payload: messageId }),
     clearCurrentSession: () => dispatch({ type: 'SET_CURRENT_SESSION', payload: null }),
+    addSession: (session: ChatSession) => dispatch({ type: 'ADD_SESSION', payload: session }),
+    updateSession: (session: ChatSession) => dispatch({ type: 'UPDATE_SESSION', payload: session }),
+    deleteSession: (sessionId: string) => dispatch({ type: 'DELETE_SESSION', payload: sessionId }),
     
     // Helper methods
     fetchMessages: async (sessionId: string) => {
@@ -629,15 +740,87 @@ export function useChatStore() {
       throw new Error('Message sending not implemented');
     },
 
-    getSessions: async (projectId?: string) => {
-      dispatch({ type: 'SET_CHAT_LOADING', payload: true });
-      
-      // For testing purposes, return empty sessions array without API call
-      console.log('Returning empty sessions for testing (API call skipped)');
-      const fallbackSessions = [];
-      dispatch({ type: 'SET_SESSIONS', payload: fallbackSessions });
-      dispatch({ type: 'SET_CHAT_LOADING', payload: false });
-      return fallbackSessions;
+    createSession: async (projectId: string, sessionData: { title: string; description?: string }) => {
+      try {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: true });
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/sessions/${projectId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: sessionData.title,
+            description: sessionData.description,
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to create chat session');
+        }
+        
+        const newSession = await response.json();
+        
+        // Transform the response to match ChatSession interface
+        const chatSession: ChatSession = {
+          id: newSession.session_id,
+          projectId: projectId,
+          title: newSession.title,
+          description: newSession.description,
+          createdAt: new Date(newSession.created_at),
+          updatedAt: new Date(newSession.created_at),
+          messageCount: 0,
+        };
+        
+        dispatch({ type: 'ADD_SESSION', payload: chatSession });
+        dispatch({ type: 'SET_CURRENT_SESSION', payload: chatSession });
+        
+        return chatSession;
+      } catch (error) {
+        dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error : new Error('Failed to create session') });
+        throw error;
+      } finally {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: false });
+      }
+    },
+
+    fetchSessions: async (projectId: string) => {
+      try {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: true });
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/sessions/${projectId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch chat sessions');
+        }
+        
+        const sessions = await response.json();
+        
+        // Transform the response to match ChatSession interface
+        const chatSessions: ChatSession[] = sessions.map((session: any) => ({
+          id: session.id,
+          projectId: projectId,
+          title: session.title,
+          description: session.metadata?.description || session.description,
+          createdAt: new Date(session.created_at),
+          updatedAt: new Date(session.updated_at),
+          messageCount: session.messages?.length || 0,
+          lastMessage: session.messages?.[0] ? {
+            content: session.messages[0].content,
+            timestamp: new Date(session.messages[0].timestamp),
+            sender: session.messages[0].sender,
+          } : undefined,
+        }));
+        
+        dispatch({ type: 'SET_SESSIONS', payload: chatSessions });
+        
+        return chatSessions;
+      } catch (error) {
+        dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error : new Error('Failed to fetch sessions') });
+        throw error;
+      } finally {
+        dispatch({ type: 'SET_CHAT_LOADING', payload: false });
+      }
     },
 
     getSessionMessages: async (sessionId: string) => {

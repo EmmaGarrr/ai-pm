@@ -89,6 +89,13 @@ class RedisService:
                     data = await self.redis.get(key)
                     if data:
                         memory_item = json.loads(data)
+                        # Extract the key from the Redis key name
+                        # Key format: project:{project_id}:memory:{type}:{actual_key}
+                        key_parts = key.split(':')
+                        if len(key_parts) >= 5:
+                            actual_key = key_parts[4]  # Get the actual key part
+                            memory_item['key'] = actual_key
+                        
                         # Simple relevance check - if query is in key or value
                         if recall_data.query.lower() in key.lower() or \
                            recall_data.query.lower() in str(memory_item.get('value', '')).lower():

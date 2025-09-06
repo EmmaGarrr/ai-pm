@@ -73,7 +73,13 @@ export function ChatHistory({ projectId, onSessionSelect, currentSessionId }: Ch
         },
       };
 
-      await createSession(sessionData);
+      const newSession = await createSession(sessionData);
+      
+      // Auto-select the newly created session
+      if (newSession && newSession.id) {
+        handleSessionSelect(newSession);
+      }
+      
       setIsCreateDialogOpen(false);
       setNewSessionTitle("");
       setNewSessionDescription("");
@@ -281,17 +287,15 @@ export function ChatHistory({ projectId, onSessionSelect, currentSessionId }: Ch
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
+                      <div
+                        className="h-6 w-6 p-0 rounded flex items-center justify-center hover:bg-gray-100 cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation();
                           // TODO: Implement session menu
                         }}
                       >
                         <MoreVertical className="h-3 w-3" />
-                      </Button>
+                      </div>
                     </div>
                   </div>
                 </Button>

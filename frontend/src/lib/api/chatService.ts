@@ -77,8 +77,11 @@ export interface TypingIndicator {
 class ChatService {
   // Session management
   async getSessions(projectId?: string, filters?: ChatFilters): Promise<ChatSession[]> {
+    if (!projectId) {
+      return [];
+    }
+    
     const params = new URLSearchParams({
-      ...(projectId && { projectId }),
       ...(filters?.search && { search: filters.search }),
       ...(filters?.dateRange && {
         startDate: filters.dateRange.start.toISOString(),
@@ -86,7 +89,7 @@ class ChatService {
       }),
     });
 
-    return apiClient.get<ChatSession[]>(`/api/chat/sessions?${params}`);
+    return apiClient.get<ChatSession[]>(`/api/chat/sessions/${projectId}?${params}`);
   }
 
   async getSession(sessionId: string): Promise<ChatSession> {
@@ -94,7 +97,7 @@ class ChatService {
   }
 
   async createSession(sessionData: ChatSessionRequest): Promise<ChatSession> {
-    return apiClient.post<ChatSession>('/api/chat/sessions', sessionData);
+    return apiClient.post<ChatSession>(`/api/chat/sessions/${sessionData.projectId}`, sessionData);
   }
 
   async updateSession(sessionId: string, updates: UpdateSessionRequest): Promise<ChatSession> {
@@ -281,7 +284,9 @@ class ChatService {
     const loadSessions = async (projectId?: string, filters?: ChatFilters) => {
       globalStore.setLoading(true);
       try {
-        await chatStore.fetchSessions(projectId, filters);
+        if (projectId) {
+          await chatStore.fetchSessions(projectId);
+        }
       } catch (error) {
         globalStore.setError(error instanceof Error ? error : new Error('Failed to load sessions'));
       } finally {
@@ -312,7 +317,10 @@ class ChatService {
     const createSession = async (sessionData: ChatSessionRequest) => {
       globalStore.setLoading(true);
       try {
-        await chatStore.createSession(sessionData);
+        await chatStore.createSession(sessionData.projectId, {
+          title: sessionData.title,
+          description: sessionData.description,
+        });
       } catch (error) {
         globalStore.setError(error instanceof Error ? error : new Error('Failed to create session'));
         throw error;
@@ -389,11 +397,7 @@ class ChatService {
       removeReaction,
       updateMessage: chatStore.updateMessage,
       deleteMessage: chatStore.deleteMessage,
-      setTyping: chatStore.setTyping,
-      clearTyping: chatStore.clearTyping,
-      joinSession: chatStore.joinSession,
-      leaveSession: chatStore.leaveSession,
-      getSessions: chatStore.getSessions,
+      getSessions: chatStore.fetchSessions,
       getSessionMessages: chatStore.getSessionMessages,
     };
   }

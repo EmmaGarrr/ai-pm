@@ -133,6 +133,17 @@ class ChatProcessingRequest(BaseModel):
     require_verification: bool = Field(default=True)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+class CreateSessionRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    settings: Optional[Dict[str, Any]] = Field(default_factory=lambda: {
+        "autoSave": True,
+        "memoryContext": True,
+        "aiAssistance": True,
+        "allowInvites": False,
+        "isPublic": False,
+    })
+
 class ChatProcessingResponse(BaseModel):
     success: bool
     ai_response: Optional[AIResponse] = None

@@ -20,20 +20,20 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = React.useState("");
   const [isTyping, setIsTyping] = React.useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = React.useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const chatStore = useChatStore();
   const projectStore = useProjectStore();
   const userStore = useUserStore();
   const globalStore = useGlobalStore();
   const { sendMessage } = useChat();
-  const { emit, isConnected } = useWebSocket();
+  const { emit, connected, connect } = useWebSocket();
 
   const currentProject = projectStore.currentProject;
   const currentSession = chatStore.currentSession;
   const messages = chatStore.messages;
-  const isLoading = chatStore.isLoading;
-  const error = chatStore.error;
+  const isLoading = chatStore.chatLoading;
+  const error = globalStore.error;
   const typingUsers = chatStore.typingUsers;
 
   // Auto-scroll to bottom
@@ -52,7 +52,7 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
   const handleInputChange = (value: string) => {
     setInputValue(value);
     
-    if (value.trim() && isConnected && currentSession) {
+    if (value.trim() && connected && currentSession) {
       setIsTyping(true);
       
       // Clear existing timeout
@@ -109,11 +109,11 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
 
   const formatMessageForDisplay = (message: Message) => {
     return {
-      sender: message.type === MessageType.USER ? "user" : "ai",
+      sender: message.type === MessageType.USER ? "user" : "ai" as "user" | "ai",
       text: message.content,
       timestamp: message.createdAt,
       status: message.status,
-      isProcessing: chatStore.aiProcessingStatus[message.id],
+      isProcessing: chatStore.aiProcessingStatus[message.id] || false,
     };
   };
 
@@ -173,7 +173,16 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
                 {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
               </div>
             )}
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+          {!connected && (
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => connect()}
+            >
+              Connect
+            </Button>
+          )}
           </div>
         </div>
       </div>
@@ -184,7 +193,7 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
           {messages.map((message) => (
             <ChatMessage
               key={message.id}
-              {...formatMessageForDisplay(message)}
+              {...formatMessageForDisplay(message as any)}
             />
           ))}
           
@@ -215,29 +224,30 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
             value={inputValue}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={!isConnected || !userStore.isAuthenticated}
+            disabled={!connected}
           />
           <Button
             type="submit"
             size="icon"
             className="absolute top-1/2 right-3 transform -translate-y-1/2"
-            disabled={!inputValue.trim() || !isConnected || !userStore.isAuthenticated}
+            disabled={!inputValue.trim() || !connected}
           >
             <CornerDownLeft className="h-5 w-5" />
           </Button>
         </form>
         
-        {!isConnected && (
+        {!connected && (
           <div className="text-xs text-red-500 mt-1">
             Disconnected from server. Messages will be queued.
           </div>
         )}
         
-        {!userStore.isAuthenticated && (
+        {/* Authentication warning hidden for development */}
+        {/* {!userStore.isAuthenticated && (
           <div className="text-xs text-red-500 mt-1">
             Please log in to send messages.
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
