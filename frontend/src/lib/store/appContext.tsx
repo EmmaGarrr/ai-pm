@@ -509,6 +509,16 @@ export function useProjectStore() {
   const createProject = async (projectData: { name: string; description: string; priority?: string }) => {
     try {
       dispatch({ type: 'SET_PROJECTS_LOADING', payload: true });
+      
+      // Prevent duplicate project creation by checking if a project with the same name already exists
+      const existingProject = state.projects.find(p => 
+        p.name.toLowerCase() === projectData.name.toLowerCase()
+      );
+      
+      if (existingProject) {
+        throw new Error('A project with this name already exists');
+      }
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/projects/`, {
         method: 'POST',
         headers: {

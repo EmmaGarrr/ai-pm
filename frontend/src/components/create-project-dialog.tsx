@@ -97,13 +97,11 @@ export function CreateProjectDialog({
         tags: tags,
       };
 
-      await createProject(projectData);
+      // Only call the callback - let the parent handle the API call
+      onProjectCreate?.(projectData);
       
       setIsSuccess(true);
       
-      // Call optional callback for backward compatibility
-      onProjectCreate?.(projectData);
-
       // Auto-close dialog after success
       setTimeout(() => {
         handleClose();
