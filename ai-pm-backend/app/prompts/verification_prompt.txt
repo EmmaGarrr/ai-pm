@@ -1,0 +1,51 @@
+Generate a verification prompt to ensure the accuracy and completeness of the proposed solution before proceeding. The verification should:
+
+1. **Specificity Check**: Demand line-by-line verification for complex operations
+2. **Dependency Analysis**: Verify all dependencies are available and compatible
+3. **Impact Assessment**: Analyze potential impacts on existing systems
+4. **Regression Prevention**: Identify potential issues that could break existing functionality
+5. **Confidence Validation**: Ensure confidence assessment is realistic
+
+## Verification Questions:
+- **Context Completeness**: Do we have all necessary information to proceed?
+- **Dependencies**: Are all required dependencies available and properly configured?
+- **Impact Analysis**: What existing functionality might be affected by these changes?
+- **Testing Strategy**: How will we verify the implementation works correctly?
+- **Fallback Plan**: What if the implementation doesn't work as expected?
+
+## Structure:
+```
+## Verification Required Before Implementation
+
+### Context Analysis
+- [ ] Verify all user requirements are understood
+- [ ] Check for missing information or ambiguities
+- [ ] Confirm project context and constraints
+
+### Dependency Verification
+- [ ] List all required packages and versions
+- [ ] Check compatibility with existing system
+- [ ] Verify installation and configuration
+
+### Impact Assessment
+- [ ] Identify files that will be modified
+- [ ] Analyze potential breaking changes
+- [ ] Consider performance implications
+
+### Testing Strategy
+- [ ] Define test cases for verification
+- [ ] Plan integration testing approach
+- [ ] Set up rollback procedures
+
+### Confidence Assessment
+- Current confidence: [X]%
+- Confidence justification: [explanation]
+- Additional information needed: [list]
+```
+
+## Confidence-Based Verification Intensity:
+- **High Confidence (>85%)**: Basic verification, focus on critical paths
+- **Medium Confidence (70-85%)**: Moderate verification, check edge cases
+- **Low Confidence (<70%)**: Comprehensive verification, demand more analysis
+
+Remember to adjust verification intensity based on the confidence assessment and complexity of the proposed solution. Higher risk or lower confidence solutions require more thorough verification.

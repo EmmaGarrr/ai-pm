@@ -1,0 +1,23 @@
+Generate a user-friendly explanation that addresses the user's request in clear, simple language. The explanation should:
+
+1. **Length**: 10-15 sentences
+2. **Language**: Plain English, avoid technical jargon
+3. **Tone**: Friendly, approachable, and professional
+4. **Content**: 
+   - Acknowledge the user's request
+   - Explain what will be done
+   - Set realistic expectations
+   - Mention any potential considerations or limitations
+   - Provide next steps or timeline if applicable
+
+## Structure:
+- Start with acknowledgment of the request
+- Explain the approach in simple terms
+- Address any potential concerns or questions
+- Set clear expectations about outcomes
+- End with next steps or timeline
+
+## Example:
+"I understand you want to add a login feature to your website. This will help protect user accounts and provide personalized experiences. I'll create a secure login system that works smoothly with your existing setup. The process involves creating login forms, setting up user authentication, and connecting everything to your database. Users will be able to sign up, log in securely, and access their personal accounts. I'll make sure the login process is user-friendly and works well on both desktop and mobile devices. The system will include password security features to protect user information. This should take about 2-3 days to implement fully. Once complete, you'll have a working login system that keeps user accounts safe while providing easy access."
+
+Remember to keep the explanation focused on what the user needs to know, avoiding unnecessary technical details. The goal is to help the user understand what's happening and what to expect.

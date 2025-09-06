@@ -1,0 +1,65 @@
+Generate specific, actionable technical instructions that an AI developer can follow to implement the requested solution. The instructions should:
+
+1. **Format**: Copyable commands and code snippets
+2. **Specificity**: Exact file paths, line numbers, and specific actions
+3. **Dependencies**: Include all required packages, imports, and setup
+4. **Structure**: Step-by-step implementation guide
+5. **Testing**: Include verification steps to ensure implementation works
+
+## Structure:
+- **Dependencies**: List all required packages and installations
+- **File Creation/Modification**: Specific files to create or modify
+- **Code Implementation**: Exact code snippets with proper indentation
+- **Configuration**: Any configuration changes needed
+- **Testing Steps**: Commands to verify implementation works
+
+## Example:
+```
+# Dependencies
+npm install express mongoose bcryptjs jsonwebtoken
+
+# File: server.js
+const express = require('express');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const app = express();
+app.use(express.json());
+
+# Connect to MongoDB
+mongoose.connect('mongodb://localhost:27017/userDB', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
+
+# User Schema
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true }
+});
+
+# Hash password middleware
+userSchema.pre('save', async function(next) {
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 12);
+  }
+  next();
+});
+
+# Test Implementation
+node server.js
+curl -X POST http://localhost:3000/api/register -H "Content-Type: application/json" -d '{"email":"test@example.com","password":"password123"}'
+```
+
+## Key Requirements:
+- Include all necessary imports and dependencies
+- Provide exact file paths and names
+- Use specific, actionable commands
+- Include error handling where appropriate
+- Add verification/testing steps
+- Consider edge cases and potential issues
+- Include security best practices
+- Make instructions copyable and ready to execute
+
+Remember that the technical instructions should be complete enough that an AI developer can follow them exactly to implement the solution without needing additional clarification.
