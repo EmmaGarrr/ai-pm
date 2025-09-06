@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     context_window_size: int = 10
     confidence_threshold: float = 0.85
     
+    # WebSocket Configuration
+    websocket_enabled: bool = True
+    websocket_port: int = 8001
+    websocket_host: str = "0.0.0.0"
+    websocket_separate_server: bool = False
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
