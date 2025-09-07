@@ -371,15 +371,16 @@ class ChatProcessor(BaseService):
     
     async def get_chat_history(self, project_id: str, session_id: Optional[str] = None, limit: int = 50) -> List[ChatMessage]:
         """Get chat history for a project or session"""
+        from ..models.memory import MemoryRecall, MessageType
         try:
             if session_id:
                 # Get messages from specific session
-                session_key = f"session_{session_id}"
-                session_data = await self.redis_service.recall_memory(
-                    project_id,
-                    session_key,
-                    ["session"]
+                session_recall = MemoryRecall(
+                    project_id=project_id,
+                    query=f"session_{session_id}",
+                    memory_types=[MessageType.CONTEXT]
                 )
+                session_data = await self.redis_service.recall_memory(session_recall)
                 
                 if session_data:
                     session = ChatSession(**session_data[0]['value'])
@@ -388,7 +389,12 @@ class ChatProcessor(BaseService):
                     return []
             else:
                 # Get all messages for project
-                all_memories = await self.redis_service.recall_memory(project_id, "", ["message"])
+                message_recall = MemoryRecall(
+                    project_id=project_id,
+                    query="",
+                    memory_types=[MessageType.MESSAGE]
+                )
+                all_memories = await self.redis_service.recall_memory(message_recall)
                 
                 # Convert to ChatMessage objects and sort by timestamp
                 messages = []

@@ -50,6 +50,8 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
       const session = chatStore.sessions.find(s => s.id === sessionId);
       if (session) {
         chatStore.setCurrentSession(session);
+        // Load messages for the selected session
+        chatStore.fetchMessages(sessionId);
         // Reset AI processing stage when switching sessions
         // This will be handled by the store initialization
       }
