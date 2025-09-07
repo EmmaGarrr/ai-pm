@@ -782,6 +782,12 @@ export function useChatStore() {
             model: msg.ai_response?.metadata?.model_info?.model_name,
             verificationRequired: (msg.ai_response?.confidence || 1) < 0.7,
           },
+          aiResponse: msg.ai_response ? {    // PRESERVE DUAL OUTPUT STRUCTURE
+            userExplanation: msg.ai_response.user_explanation,
+            technicalInstructions: msg.ai_response.technical_instruction,
+            confidence: msg.ai_response.confidence,
+            metadata: msg.ai_response.metadata
+          } : undefined,
           createdAt: new Date(msg.timestamp),
           updatedAt: new Date(msg.timestamp),
           isEdited: false,
@@ -987,6 +993,12 @@ export function useChatStore() {
               verificationRequired: data.ai_response.confidence < 0.7,
               relatedIssues: data.ai_response.metadata?.memory_keys,
               dependencies: data.ai_response.metadata?.dependencies,
+            },
+            aiResponse: {    // ADD DUAL OUTPUT STRUCTURE
+              userExplanation: data.ai_response.user_explanation,
+              technicalInstructions: data.ai_response.technical_instruction,
+              confidence: data.ai_response.confidence,
+              metadata: data.ai_response.metadata
             },
             createdAt: new Date(data.ai_response.timestamp),
             updatedAt: new Date(data.ai_response.timestamp),

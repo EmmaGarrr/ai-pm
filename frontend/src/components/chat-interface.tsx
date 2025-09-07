@@ -141,6 +141,9 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
       processingStage: chatStore.aiProcessingStage,
       error: message.status === 'failed' ? message.content : undefined,
       onRetry: message.status === 'failed' ? () => handleRetryMessage(message.id) : undefined,
+      hasDualOutput: !!message.aiResponse,    // ADD: Flag for dual output detection
+      aiResponse: message.aiResponse,         // ADD: Pass dual output data
+      messageId: message.id,                  // ADD: Pass message ID
     };
   };
 

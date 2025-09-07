@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { Folder, User, Loader2, Check, RefreshCw, AlertCircle } from "lucide-react";
+import DualOutputContainer from "./chat/DualOutputContainer";
 
 interface ChatMessageProps {
   sender: "user" | "ai";
@@ -14,6 +15,14 @@ interface ChatMessageProps {
   error?: string;
   onRetry?: () => void;
   processingStage?: "thinking" | "analyzing" | "generating" | "completed";
+  hasDualOutput?: boolean;    // ADD: Flag for dual output detection
+  aiResponse?: {             // ADD: Dual output data
+    userExplanation: string;
+    technicalInstructions: string;
+    confidence: number;
+    metadata?: any;
+  };
+  messageId?: string;         // ADD: Message ID for DualOutputContainer
 }
 
 export function ChatMessage({ 
@@ -25,7 +34,10 @@ export function ChatMessage({
   isLoading, 
   error, 
   onRetry, 
-  processingStage 
+  processingStage,
+  hasDualOutput,
+  aiResponse,
+  messageId
 }: ChatMessageProps) {
   const isUser = sender === "user";
   const formatTime = (date?: Date) => {
@@ -90,6 +102,30 @@ export function ChatMessage({
             </button>
           )}
         </div>
+      );
+    }
+
+    // ADD: Dual output rendering for AI messages
+    if (hasDualOutput && aiResponse && sender === 'ai') {
+      return (
+        <DualOutputContainer
+          message={{
+            id: messageId || `temp_${Date.now()}`,  // Use the actual ID
+            userExplanation: aiResponse.userExplanation,
+            technicalInstructions: aiResponse.technicalInstructions,
+            confidence: aiResponse.confidence,
+            timestamp: timestamp || new Date(),
+            type: 'ai_response',
+            metadata: {
+              dependencies: aiResponse.metadata?.dependencies,
+              language: aiResponse.metadata?.language,
+              isCode: aiResponse.metadata?.isCode,
+              verificationStatus: aiResponse.confidence > 0.7 ? 'verified' : 'pending'
+            }
+          }}
+          compact={true}
+          showActions={false}
+        />
       );
     }
 

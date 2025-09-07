@@ -105,6 +105,12 @@ export interface Message extends BaseEntity {
   editedAt?: Date;
   reactions: MessageReaction[];
   attachments: Attachment[];
+  aiResponse?: {           // ADD THIS FIELD
+    userExplanation: string;
+    technicalInstructions: string;
+    confidence: number;
+    metadata?: any;
+  };
 }
 
 export enum MessageType {
