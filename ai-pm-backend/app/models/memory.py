@@ -8,6 +8,7 @@ class MessageType(str, Enum):
     SOLUTION = "solution"
     CONTEXT = "context"
     DEPENDENCY = "dependency"
+    MESSAGE = "message"
 
 class MemoryItem(BaseModel):
     key: str

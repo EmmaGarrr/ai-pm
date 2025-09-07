@@ -225,7 +225,7 @@ class ChatProcessor(BaseService):
             memory_data = MemoryCreate(
                 key=memory_key,
                 value=message.dict(),
-                type=MessageType.CONTEXT,  # Use CONTEXT instead of MESSAGE
+                type=MessageType.MESSAGE,  # Store as actual message type
                 project_id=message.project_id
             )
             return await self.redis_service.store_memory(memory_data)
@@ -250,6 +250,12 @@ class ChatProcessor(BaseService):
             
             if existing_session:
                 session_data = existing_session[0]['value']
+                # Convert datetime strings back to datetime objects
+                if isinstance(session_data.get('created_at'), str):
+                    session_data['created_at'] = datetime.fromisoformat(session_data['created_at'])
+                if isinstance(session_data.get('updated_at'), str):
+                    session_data['updated_at'] = datetime.fromisoformat(session_data['updated_at'])
+                
                 session = ChatSession(**session_data)
             else:
                 session = ChatSession(
@@ -383,7 +389,14 @@ class ChatProcessor(BaseService):
                 session_data = await self.redis_service.recall_memory(session_recall)
                 
                 if session_data:
-                    session = ChatSession(**session_data[0]['value'])
+                    # Convert datetime strings back to datetime objects
+                    session_dict = session_data[0]['value']
+                    if isinstance(session_dict.get('created_at'), str):
+                        session_dict['created_at'] = datetime.fromisoformat(session_dict['created_at'])
+                    if isinstance(session_dict.get('updated_at'), str):
+                        session_dict['updated_at'] = datetime.fromisoformat(session_dict['updated_at'])
+                    
+                    session = ChatSession(**session_dict)
                     return session.messages[-limit:]  # Return last N messages
                 else:
                     return []
