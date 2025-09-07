@@ -58,6 +58,14 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
     }
   }, [sessionId, chatStore.sessions]);
 
+  // Auto-restore session on component mount if no sessionId prop
+  React.useEffect(() => {
+    if (!sessionId && chatStore.currentSession && chatStore.currentSession.project_id === projectId) {
+      // If we have a saved session but no sessionId prop, load its messages
+      chatStore.fetchMessages(chatStore.currentSession.id);
+    }
+  }, [sessionId, chatStore.currentSession, projectId]);
+
   // Handle typing indicator
   const handleInputChange = (value: string) => {
     setInputValue(value);

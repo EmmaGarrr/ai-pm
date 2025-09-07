@@ -56,6 +56,22 @@ export default function ProjectChatPage() {
         // Fetch chat sessions for this project
         await getSessions(projectId);
         
+        // Restore saved session if it belongs to this project
+        if (chatStore.currentSession && chatStore.currentSession.project_id === projectId) {
+          // Verify the session still exists in the fetched sessions
+          const sessionExists = chatStore.sessions.some(s => s.id === chatStore.currentSession?.id);
+          if (sessionExists) {
+            // The saved session is valid and belongs to this project
+            console.log('Restoring saved chat session:', chatStore.currentSession.id);
+          } else {
+            // Session no longer exists, clear it
+            chatStore.setCurrentSession(null);
+          }
+        } else if (chatStore.currentSession) {
+          // Saved session belongs to a different project, clear it
+          chatStore.setCurrentSession(null);
+        }
+        
         // Connect to WebSocket for real-time updates
         await connect({
           projectId,

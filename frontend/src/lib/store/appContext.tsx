@@ -447,6 +447,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
           console.error('Failed to parse saved session:', error);
         }
       }
+      
+      // Load current chat session from localStorage
+      const savedChatSession = localStorage.getItem('currentChatSession');
+      if (savedChatSession) {
+        try {
+          const chatSessionData = JSON.parse(savedChatSession);
+          dispatch({ type: 'SET_CURRENT_SESSION', payload: chatSessionData });
+        } catch (error) {
+          console.error('Failed to parse saved chat session:', error);
+        }
+      }
     }
   }, []);
 
@@ -472,6 +483,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('userSession');
     }
   }, [state.session]);
+
+  // Save current chat session to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && state.currentSession) {
+      localStorage.setItem('currentChatSession', JSON.stringify(state.currentSession));
+    } else if (typeof window !== 'undefined') {
+      localStorage.removeItem('currentChatSession');
+    }
+  }, [state.currentSession]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
