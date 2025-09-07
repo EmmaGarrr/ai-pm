@@ -358,12 +358,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, messages: [...state.messages, action.payload] };
     
     case 'UPDATE_MESSAGE':
-      console.log('UPDATE_MESSAGE action received:', action.payload);
-      console.log('Current messages:', state.messages.map(m => ({ id: m.id, content: m.content.substring(0, 50) })));
       const updatedMessages = state.messages.map(m =>
         m.id === action.payload.id ? action.payload : m
       );
-      console.log('Updated messages:', updatedMessages.map(m => ({ id: m.id, content: m.content.substring(0, 50) })));
       return {
         ...state,
         messages: updatedMessages,
@@ -454,6 +451,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const chatSessionData = JSON.parse(savedChatSession);
           dispatch({ type: 'SET_CURRENT_SESSION', payload: chatSessionData });
+          
+          // Load messages for the restored session from localStorage
+          const savedMessages = localStorage.getItem(`chat_messages_${chatSessionData.id}`);
+          if (savedMessages) {
+            try {
+              const parsedMessages = JSON.parse(savedMessages);
+              // Convert date strings back to Date objects
+              const messagesWithDates = parsedMessages.map((msg: any) => ({
+                ...msg,
+                createdAt: new Date(msg.createdAt),
+                updatedAt: new Date(msg.updatedAt),
+              }));
+              dispatch({ type: 'SET_MESSAGES', payload: messagesWithDates });
+              console.log('Restored messages from localStorage:', messagesWithDates.length);
+            } catch (error) {
+              console.error('Failed to parse saved messages:', error);
+            }
+          }
         } catch (error) {
           console.error('Failed to parse saved chat session:', error);
         }
@@ -492,6 +507,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('currentChatSession');
     }
   }, [state.currentSession]);
+
+  // Save messages to localStorage when they change
+  useEffect(() => {
+    if (typeof window !== 'undefined' && state.currentSession && state.messages.length > 0) {
+      const messageKey = `chat_messages_${state.currentSession.id}`;
+      localStorage.setItem(messageKey, JSON.stringify(state.messages));
+    }
+  }, [state.messages, state.currentSession]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
@@ -728,7 +751,9 @@ export function useChatStore() {
           throw new Error('No project selected');
         }
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/history/${currentProjectId}?session_id=${sessionId}&limit=50`, {
+        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/history/${currentProjectId}?session_id=${sessionId}&limit=50`;
+        
+        const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -742,7 +767,7 @@ export function useChatStore() {
         const messages = await response.json();
         
         // Transform backend messages to frontend format
-        const transformedMessages: Message[] = messages.map((msg: any) => ({
+        let transformedMessages: Message[] = messages.map((msg: any) => ({
           id: msg.id,
           sessionId: sessionId,
           userId: state.user?.id || 'system',
@@ -762,6 +787,25 @@ export function useChatStore() {
           isEdited: false,
           reactions: [],
         }));
+        
+        // If backend returns empty messages, try to load from localStorage as fallback
+        if (transformedMessages.length === 0 && typeof window !== 'undefined') {
+          const savedMessages = localStorage.getItem(`chat_messages_${sessionId}`);
+          if (savedMessages) {
+            try {
+              const parsedMessages = JSON.parse(savedMessages);
+              // Convert date strings back to Date objects
+              transformedMessages = parsedMessages.map((msg: any) => ({
+                ...msg,
+                createdAt: new Date(msg.createdAt),
+                updatedAt: new Date(msg.updatedAt),
+              }));
+              console.log('Loaded messages from localStorage fallback:', transformedMessages.length);
+            } catch (error) {
+              console.error('Failed to parse saved messages:', error);
+            }
+          }
+        }
         
         dispatch({ type: 'SET_MESSAGES', payload: transformedMessages });
         return transformedMessages;
@@ -897,8 +941,6 @@ export function useChatStore() {
         
         const data = await response.json();
         
-        console.log('AI Response from backend:', data);
-        
         // Update user message status to sent
         dispatch({ 
           type: 'UPDATE_MESSAGE_STATUS', 
@@ -950,11 +992,7 @@ export function useChatStore() {
             updatedAt: new Date(data.ai_response.timestamp),
           };
           
-          console.log('Updating AI message with:', updatedMessage);
-          console.log('Current messages before update:', state.messages.length);
-          console.log('Placeholder message ID:', aiPlaceholderMessage.id);
-          console.log('Looking for message with ID:', aiPlaceholderMessage.id);
-          
+                    
           dispatch({ 
             type: 'UPDATE_MESSAGE', 
             payload: updatedMessage
@@ -971,8 +1009,7 @@ export function useChatStore() {
             payload: updatedStatus
           });
           
-          console.log('Updated AI message, new stage:', 'completed');
-          
+                    
           // Show notification for low confidence responses
           if (data.ai_response.confidence < 0.7) {
             dispatch({ 
@@ -999,7 +1036,6 @@ export function useChatStore() {
           
           // Reset AI processing stage after a short delay
           setTimeout(() => {
-            console.log('Resetting AI processing stage to idle after timeout');
             dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'idle' });
           }, 1500);
         }
@@ -1120,7 +1156,6 @@ export function useChatStore() {
       dispatch({ type: 'SET_CHAT_LOADING', payload: true });
       
       // For testing purposes, return empty messages array without API call
-      console.log('Returning empty messages for testing (API call skipped)');
       const fallbackMessages = [];
       dispatch({ type: 'SET_MESSAGES', payload: fallbackMessages });
       dispatch({ type: 'SET_CHAT_LOADING', payload: false });

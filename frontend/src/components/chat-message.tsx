@@ -83,7 +83,7 @@ export function ChatMessage({
           {onRetry && (
             <button
               onClick={onRetry}
-              className="flex items-center gap-2 text-sm text-primary hover:underline"
+              className="flex items-center gap-2 text-sm text-primary"
             >
               <RefreshCw className="h-3 w-3" />
               Retry
@@ -96,16 +96,17 @@ export function ChatMessage({
     return <p className="whitespace-pre-wrap">{text}</p>;
   };
 
+  
   return (
     <div
       className={cn(
-        "flex items-start gap-3 transition-all duration-300 ease-in-out",
+        "flex items-start gap-3 group",
         isUser ? "justify-end" : "justify-start",
         isLoading && "animate-pulse"
       )}
     >
       {!isUser && (
-        <Avatar className="h-8 w-8 transition-transform duration-200 hover:scale-105">
+        <Avatar className="h-8 w-8">
           <AvatarFallback className="bg-primary/10 text-primary">
             <Folder className="h-5 w-5" />
           </AvatarFallback>
@@ -113,20 +114,20 @@ export function ChatMessage({
       )}
       <div
         className={cn(
-          "max-w-[70%] rounded-lg p-3 text-sm transition-all duration-300 ease-in-out",
+          "max-w-[70%] rounded-lg p-3 text-sm",
           isUser
-            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-            : "bg-background border hover:bg-muted/50",
-          (isLoading || isProcessing) && "opacity-90 transform scale-[0.98]",
+            ? "bg-primary text-primary-foreground"
+            : "bg-background border",
+          (isLoading || isProcessing) && "opacity-90",
           error && "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
         )}
       >
-        <div className="transition-all duration-200 ease-in-out">
+        <div>
           {renderContent()}
         </div>
         {(timestamp || status || isProcessing || isLoading) && (
           <div className={cn(
-            "flex items-center gap-1 mt-1 text-xs transition-opacity duration-200",
+            "flex items-center gap-1 mt-1 text-xs",
             isUser ? "text-primary-foreground/70" : "text-muted-foreground"
           )}>
             {formatTime(timestamp)}
@@ -135,7 +136,7 @@ export function ChatMessage({
         )}
       </div>
       {isUser && (
-        <Avatar className="h-8 w-8 transition-transform duration-200 hover:scale-105">
+        <Avatar className="h-8 w-8">
            <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
           <AvatarFallback>
             <User className="h-5 w-5" />

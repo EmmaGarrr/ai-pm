@@ -38,11 +38,13 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
   const error = globalStore.error;
   const typingUsers = chatStore.typingUsers;
 
+  
   // Auto-scroll to bottom
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  
   
   // Load messages when session changes
   React.useEffect(() => {
@@ -248,24 +250,19 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
           {messages.map((message, index) => (
             <div
               key={message.id}
-              className="transition-all duration-300 ease-in-out transform hover:scale-[1.01]"
-              style={{
-                animationDelay: `${index * 50}ms`,
-                animationFillMode: 'both'
-              }}
             >
               <ChatMessage
                 {...formatMessageForDisplay(message as any)}
               />
             </div>
           ))}
-          
+            
           {/* AI Thinking Indicator */}
           {(chatStore.aiProcessingStage === 'thinking' || 
            chatStore.aiProcessingStage === 'analyzing' || 
            chatStore.aiProcessingStage === 'generating') &&
            messages.some(m => m.id.startsWith('ai_temp_') && m.content === '') && (
-            <div className="flex items-start gap-3 transition-all duration-300 ease-in-out">
+            <div className="flex items-start gap-3">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary/10 text-primary">
                   <Folder className="h-5 w-5" />
@@ -291,7 +288,7 @@ export function ChatInterface({ projectId, sessionId }: ChatInterfaceProps) {
           
           {/* Typing indicators */}
           {typingUsers.length > 0 && (
-            <div className="flex items-center space-x-2 text-muted-foreground transition-all duration-300 ease-in-out">
+            <div className="flex items-center space-x-2 text-muted-foreground">
               <div className="flex space-x-1">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />

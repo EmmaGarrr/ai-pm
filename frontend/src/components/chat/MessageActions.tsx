@@ -79,14 +79,14 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         <div className="flex justify-end space-x-2">
           <button
             onClick={handleCancelEdit}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
+            className="px-3 py-1 text-sm text-gray-600 flex items-center space-x-1"
           >
             <X className="h-4 w-4" />
             <span>Cancel</span>
           </button>
           <button
             onClick={handleEdit}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center space-x-1"
+            className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md flex items-center space-x-1"
           >
             <Check className="h-4 w-4" />
             <span>Save</span>
@@ -99,13 +99,13 @@ const MessageActions: React.FC<MessageActionsProps> = ({
   return (
     <div className={cn('relative', className)}>
       <div className={cn(
-        'flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity',
+        'flex items-center space-x-1 opacity-0 group-hover:opacity-100',
         showActions && 'opacity-100'
       )}>
         {/* Copy button */}
         <button
           onClick={handleCopy}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 rounded"
           title={copied ? 'Copied!' : 'Copy message'}
         >
           {copied ? (
@@ -118,7 +118,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         {/* Edit button */}
         <button
           onClick={handleEdit}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 rounded"
           title="Edit message"
         >
           <Edit className="h-4 w-4 text-gray-600" />
@@ -127,7 +127,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         {/* Export button */}
         <button
           onClick={handleExport}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 rounded"
           title="Export message"
         >
           <Download className="h-4 w-4 text-gray-600" />
@@ -137,7 +137,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
+            className="p-1 rounded"
             title="More actions"
           >
             <MoreHorizontal className="h-4 w-4 text-gray-600" />
@@ -148,21 +148,21 @@ const MessageActions: React.FC<MessageActionsProps> = ({
               <div className="py-1">
                 <button
                   onClick={handleEdit}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 flex items-center space-x-2"
                 >
                   <Edit className="h-4 w-4" />
                   <span>Edit</span>
                 </button>
                 <button
                   onClick={handleCopy}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 flex items-center space-x-2"
                 >
                   <Copy className="h-4 w-4" />
                   <span>Copy</span>
                 </button>
                 <button
                   onClick={handleExport}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 flex items-center space-x-2"
                 >
                   <Download className="h-4 w-4" />
                   <span>Export</span>
@@ -170,7 +170,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
                 <div className="border-t border-gray-200 my-1" />
                 <button
                   onClick={handleDelete}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 flex items-center space-x-2"
                 >
                   <Trash2 className="h-4 w-4" />
                   <span>Delete</span>
@@ -183,7 +183,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         {/* Delete button */}
         <button
           onClick={handleDelete}
-          className="p-1 hover:bg-red-50 rounded transition-colors"
+          className="p-1 rounded"
           title="Delete message"
         >
           <Trash2 className="h-4 w-4 text-red-600" />

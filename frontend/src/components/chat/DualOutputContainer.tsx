@@ -74,7 +74,7 @@ const DualOutputContainer: React.FC<DualOutputContainerProps> = ({
 
   if (compact && !isExpanded) {
     return (
-      <div className={cn('border rounded-lg p-3 hover:shadow-md transition-shadow', className)}>
+      <div className={cn('border rounded-lg p-3', className)}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <div className={cn(
@@ -103,7 +103,7 @@ const DualOutputContainer: React.FC<DualOutputContainerProps> = ({
             <ConfidenceIndicator confidence={message.confidence} size="sm" />
             <button
               onClick={() => setIsExpanded(true)}
-              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              className="p-1 rounded"
             >
               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -178,7 +178,7 @@ const DualOutputContainer: React.FC<DualOutputContainerProps> = ({
           {compact && (
             <button
               onClick={() => setIsExpanded(false)}
-              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              className="p-1 rounded"
             >
               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
