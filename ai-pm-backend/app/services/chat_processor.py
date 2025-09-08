@@ -11,10 +11,129 @@ from ..models.ai_response import (
     AIResponse, ChatMessage, ChatSession, ChatProcessingRequest, 
     ChatProcessingResponse, VerificationRequest, VerificationResponse
 )
+from ..models.memory import MemoryCreate, MemoryRecall, MessageType
 from ..events.websocket_events import WebSocketEvents
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+class AdaptiveWorkflow:
+    """Manages adaptive workflow state using existing Redis infrastructure"""
+    
+    def __init__(self, redis_service, project_id):
+        self.redis = redis_service
+        self.key = f"project:{project_id}:memory:workflow:state"
+        
+    async def get_state(self) -> Dict[str, Any]:
+        """Get current workflow state"""
+        try:
+            # Use existing Redis service pattern
+            result = await self.redis.recall_memory(MemoryRecall(
+                project_id=self.key.split(':')[1],
+                query="workflow_state",
+                memory_types=[MessageType.CONTEXT],
+                limit=1
+            ))
+            
+            if result:
+                return json.loads(result[0]['value'])
+            else:
+                return {
+                    "depth_level": 0,
+                    "original_problem": "",
+                    "stage_outputs": [],
+                    "analysis_complete": False,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+        except Exception as e:
+            logger.error(f"Error getting workflow state: {e}")
+            return self._get_default_state()
+    
+    async def advance_stage(self, analysis_output: str, ai_response: Dict[str, Any]) -> Dict[str, Any]:
+        """Advance to next analysis stage"""
+        state = await self.get_state()
+        
+        # Compress analysis output to ~200 tokens
+        compressed_output = self._compress_analysis(analysis_output)
+        
+        # Add to stage outputs
+        state["stage_outputs"].append({
+            "depth": state["depth_level"],
+            "output": compressed_output,
+            "confidence": ai_response.get("confidence", 0),
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        # Advance depth level
+        state["depth_level"] += 1
+        
+        # Check if analysis is complete
+        state["analysis_complete"] = self._is_analysis_complete(ai_response)
+        
+        # Save state using existing memory system
+        await self._save_state(state)
+        
+        return state
+    
+    def should_advance(self, ai_response: Dict[str, Any]) -> bool:
+        """Determine if workflow should advance based on AI response"""
+        confidence = ai_response.get("confidence", 0)
+        user_explanation = ai_response.get("user_explanation", "")
+        
+        # Advance if high confidence or explicit completion signal
+        if confidence >= 0.95:
+            return True
+        
+        if "ANALYSIS_COMPLETE" in user_explanation.upper():
+            return True
+            
+        if "READY_FOR_IMPLEMENTATION" in user_explanation.upper():
+            return True
+            
+        return False
+    
+    def _compress_analysis(self, analysis: str) -> str:
+        """Compress analysis to ~200 tokens"""
+        # Simple compression - take first 800 characters (~200 tokens)
+        if len(analysis) > 800:
+            return analysis[:800] + "... [analysis truncated]"
+        return analysis
+    
+    def _is_analysis_complete(self, ai_response: Dict[str, Any]) -> bool:
+        """Check if analysis is complete"""
+        confidence = ai_response.get("confidence", 0)
+        user_explanation = ai_response.get("user_explanation", "")
+        
+        return (
+            confidence >= 0.95 or
+            "ANALYSIS_COMPLETE" in user_explanation.upper() or
+            "READY_FOR_IMPLEMENTATION" in user_explanation.upper()
+        )
+    
+    def _get_default_state(self) -> Dict[str, Any]:
+        """Get default workflow state"""
+        return {
+            "depth_level": 0,
+            "original_problem": "",
+            "stage_outputs": [],
+            "analysis_complete": False,
+            "created_at": datetime.utcnow().isoformat()
+        }
+    
+    async def _save_state(self, state: Dict[str, Any]) -> bool:
+        """Save workflow state using existing memory system"""
+        try:
+            memory_data = MemoryCreate(
+                key="workflow_state",
+                value=state,
+                type=MessageType.CONTEXT,
+                project_id=self.key.split(':')[1]
+            )
+            
+            return await self.redis.store_memory(memory_data)
+        except Exception as e:
+            logger.error(f"Error saving workflow state: {e}")
+            return False
 
 class ChatProcessor(BaseService):
     """Chat processing pipeline with verification loop"""
@@ -26,6 +145,7 @@ class ChatProcessor(BaseService):
         self.redis_service = redis_service
         self.confidence_threshold = 0.85
         self.verification_required = True
+        self.workflow_manager = None  # Will be initialized per request
         
         # Get WebSocket and status services
         self.websocket_service = get_websocket_service()
@@ -53,6 +173,17 @@ class ChatProcessor(BaseService):
         start_time = datetime.utcnow()
         
         try:
+            # Initialize workflow manager for this project
+            self.workflow_manager = AdaptiveWorkflow(self.redis_service, request.project_id)
+            
+            # Get current workflow state
+            workflow_state = await self.workflow_manager.get_state()
+            
+            # If this is the first message, store the original problem
+            if workflow_state["depth_level"] == 0:
+                workflow_state["original_problem"] = request.user_message[:500]
+                await self.workflow_manager._save_state(workflow_state)
+            
             # Emit processing start event
             await self._emit_processing_start(request)
             
@@ -76,19 +207,27 @@ class ChatProcessor(BaseService):
             )
             await self._emit_ai_processing_complete(request, ai_response)
             
-            # Step 4: Determine if verification is needed
+            # Step 4: Handle workflow advancement
+            if self.workflow_manager.should_advance(ai_response):
+                updated_state = await self.workflow_manager.advance_stage(
+                    ai_response.get("user_explanation", ""),
+                    ai_response
+                )
+                logger.info(f"Workflow advanced to depth level {updated_state['depth_level']}")
+            
+            # Step 6: Determine if verification is needed
             verification_required = self._determine_verification_needed(ai_response, request.require_verification)
             
-            # Step 5: Store message and response
+            # Step 7: Store message and response
             message_stored = await self._store_chat_interaction(request, ai_response, context_analysis)
             
-            # Step 6: Generate verification prompt if needed
+            # Step 8: Generate verification prompt if needed
             verification_prompt = None
             if verification_required:
                 verification_prompt = await self._generate_verification_prompt(request, ai_response)
                 await self._emit_verification_required(request, verification_prompt)
             
-            # Step 7: Update session if session_id provided
+            # Step 9: Update session if session_id provided
             session_updated = False
             if request.session_id:
                 session_updated = await self._update_chat_session(request.session_id, request, ai_response)
@@ -155,6 +294,23 @@ class ChatProcessor(BaseService):
                 ai_context['recent_chat_history'] = []
         else:
             ai_context['recent_chat_history'] = []
+        
+        # Add workflow context
+        if hasattr(self, 'workflow_manager') and self.workflow_manager:
+            workflow_state = await self.workflow_manager.get_state()
+            
+            # Create workflow context for AI
+            workflow_context = {
+                "current_depth": workflow_state["depth_level"],
+                "original_problem": workflow_state["original_problem"],
+                "completed_stages": len(workflow_state["stage_outputs"]),
+                "analysis_complete": workflow_state["analysis_complete"],
+                "recent_insights": [
+                    stage["output"] for stage in workflow_state["stage_outputs"][-3:]
+                ]
+            }
+            
+            ai_context["workflow"] = workflow_context
         
         # Add user-provided context
         if user_context:
