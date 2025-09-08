@@ -66,7 +66,7 @@ class ChatProcessor(BaseService):
             await self._emit_context_analysis_complete(request, context_analysis)
             
             # Step 2: Prepare context for AI
-            ai_context = self._prepare_ai_context(context_analysis, request.context)
+            ai_context = await self._prepare_ai_context(context_analysis, request.context, request)
             
             # Step 3: Generate AI response
             await self._emit_ai_processing_start(request)
@@ -127,8 +127,8 @@ class ChatProcessor(BaseService):
                 processing_time=processing_time
             )
     
-    def _prepare_ai_context(self, context_analysis, user_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare context for AI generation"""
+    async def _prepare_ai_context(self, context_analysis, user_context: Dict[str, Any], request: 'ChatProcessingRequest') -> Dict[str, Any]:
+        """Prepare context for AI generation with chat history"""
         ai_context = {
             'context_analysis': context_analysis.dict(),
             'relevant_memories': context_analysis.relevant_memories,
@@ -137,6 +137,24 @@ class ChatProcessor(BaseService):
             'confidence_score': context_analysis.confidence_score,
             'suggested_actions': context_analysis.suggested_actions
         }
+        
+        # Add chat history if session_id provided
+        if request.session_id:
+            try:
+                recent_messages = await self.get_chat_history(request.project_id, request.session_id, limit=10)
+                ai_context['recent_chat_history'] = [
+                    {
+                        'role': msg.role,
+                        'content': msg.content,
+                        'timestamp': msg.timestamp.isoformat()
+                    }
+                    for msg in recent_messages
+                ]
+            except Exception as e:
+                logger.warning(f"Failed to retrieve chat history: {e}")
+                ai_context['recent_chat_history'] = []
+        else:
+            ai_context['recent_chat_history'] = []
         
         # Add user-provided context
         if user_context:
@@ -162,6 +180,7 @@ class ChatProcessor(BaseService):
                 project_id=request.project_id,
                 role="user",
                 content=request.user_message,
+                session_id=request.session_id,
                 metadata={
                     'context_analysis': context_analysis.dict(),
                     'processing_timestamp': datetime.utcnow().isoformat()
@@ -174,6 +193,7 @@ class ChatProcessor(BaseService):
                 role="ai_pm",
                 content=f"User Explanation: {ai_response.get('user_explanation', '')}\n\nTechnical Instruction: {ai_response.get('technical_instruction', '')}",
                 ai_response=ai_response,
+                session_id=request.session_id,
                 metadata={
                     'confidence': ai_response.get('confidence', 0.5),
                     'processing_time': ai_response.get('metadata', {}).get('processing_time', 0),
@@ -249,14 +269,55 @@ class ChatProcessor(BaseService):
             existing_session = await self.redis_service.recall_memory(recall_data)
             
             if existing_session:
-                session_data = existing_session[0]['value']
-                # Convert datetime strings back to datetime objects
-                if isinstance(session_data.get('created_at'), str):
-                    session_data['created_at'] = datetime.fromisoformat(session_data['created_at'])
-                if isinstance(session_data.get('updated_at'), str):
-                    session_data['updated_at'] = datetime.fromisoformat(session_data['updated_at'])
+                # Defensive: Validate the structure of existing_session[0]
+                memory_item = existing_session[0]
                 
-                session = ChatSession(**session_data)
+                # Check if memory_item has the expected structure
+                if not isinstance(memory_item, dict):
+                    logger.error(f"Invalid memory item structure: {type(memory_item)}")
+                    return False
+                
+                if 'value' not in memory_item:
+                    logger.error(f"Memory item missing 'value' field: {memory_item}")
+                    return False
+                
+                # Extract session data with validation
+                session_data = memory_item['value']
+                
+                # Validate session_data structure
+                if not isinstance(session_data, dict):
+                    logger.error(f"Invalid session data structure: {type(session_data)}")
+                    return False
+                
+                # Check for required fields in session_data
+                required_fields = ['id', 'project_id', 'title']
+                for field in required_fields:
+                    if field not in session_data:
+                        logger.error(f"Missing required field '{field}' in session data: {session_data}")
+                        return False
+                
+                # Convert datetime strings back to datetime objects
+                datetime_fields = ['created_at', 'updated_at']
+                for field in datetime_fields:
+                    if field in session_data:
+                        if isinstance(session_data[field], str):
+                            try:
+                                session_data[field] = datetime.fromisoformat(session_data[field])
+                            except ValueError as e:
+                                logger.warning(f"Failed to parse {field} datetime: {e}")
+                                session_data[field] = datetime.utcnow()
+                        elif not isinstance(session_data[field], datetime):
+                            logger.warning(f"Invalid {field} type: {type(session_data[field])}")
+                            session_data[field] = datetime.utcnow()
+                
+                # Create ChatSession with validated data
+                try:
+                    session = ChatSession(**session_data)
+                    logger.info(f"Successfully reconstructed ChatSession: {session.id}")
+                except Exception as e:
+                    logger.error(f"Failed to create ChatSession: {e}")
+                    logger.error(f"Session data: {session_data}")
+                    return False
             else:
                 session = ChatSession(
                     id=session_id,
@@ -268,14 +329,16 @@ class ChatProcessor(BaseService):
             user_message = ChatMessage(
                 project_id=request.project_id,
                 role="user",
-                content=request.user_message
+                content=request.user_message,
+                session_id=request.session_id
             )
             
             ai_message = ChatMessage(
                 project_id=request.project_id,
                 role="ai_pm",
                 content=f"User Explanation: {ai_response.get('user_explanation', '')}\n\nTechnical Instruction: {ai_response.get('technical_instruction', '')}",
-                ai_response=ai_response
+                ai_response=ai_response,
+                session_id=request.session_id
             )
             
             session.messages.extend([user_message, ai_message])
@@ -284,7 +347,7 @@ class ChatProcessor(BaseService):
             # Store updated session
             memory_data = MemoryCreate(
                 key=session_key,
-                value=session.dict(),
+                value=session.model_dump(),
                 type=MessageType.CONTEXT,  # Use CONTEXT instead of SESSION
                 project_id=request.project_id
             )
@@ -293,6 +356,12 @@ class ChatProcessor(BaseService):
             
         except Exception as e:
             logger.error(f"Error updating chat session: {e}")
+            logger.error(f"Session ID: {session_id}")
+            logger.error(f"Project ID: {request.project_id}")
+            logger.error(f"Existing session data: {existing_session}")
+            if existing_session:
+                logger.error(f"First memory item structure: {type(existing_session[0])}")
+                logger.error(f"First memory item keys: {list(existing_session[0].keys()) if isinstance(existing_session[0], dict) else 'Not a dict'}")
             return False
     
     async def _generate_verification_prompt(self, request: ChatProcessingRequest, ai_response: Dict[str, Any]) -> str:
@@ -380,26 +449,33 @@ class ChatProcessor(BaseService):
         from ..models.memory import MemoryRecall, MessageType
         try:
             if session_id:
-                # Get messages from specific session
-                session_recall = MemoryRecall(
+                # Get individual messages for specific session
+                message_recall = MemoryRecall(
                     project_id=project_id,
-                    query=f"session_{session_id}",
-                    memory_types=[MessageType.CONTEXT]
+                    query="",
+                    memory_types=[MessageType.MESSAGE]
                 )
-                session_data = await self.redis_service.recall_memory(session_recall)
+                all_memories = await self.redis_service.recall_memory(message_recall)
                 
-                if session_data:
-                    # Convert datetime strings back to datetime objects
-                    session_dict = session_data[0]['value']
-                    if isinstance(session_dict.get('created_at'), str):
-                        session_dict['created_at'] = datetime.fromisoformat(session_dict['created_at'])
-                    if isinstance(session_dict.get('updated_at'), str):
-                        session_dict['updated_at'] = datetime.fromisoformat(session_dict['updated_at'])
-                    
-                    session = ChatSession(**session_dict)
-                    return session.messages[-limit:]  # Return last N messages
-                else:
-                    return []
+                # Convert to ChatMessage objects and filter by session_id
+                messages = []
+                for memory in all_memories:
+                    try:
+                        message_data = memory['value']
+                        if isinstance(message_data, dict):
+                            # Handle missing session_id for legacy messages
+                            if 'session_id' not in message_data:
+                                message_data['session_id'] = None
+                            message = ChatMessage(**message_data)
+                            if message.session_id == session_id:
+                                messages.append(message)
+                    except Exception as e:
+                        logger.error(f"Error parsing message from memory: {e}")
+                        continue
+                
+                # Sort by timestamp and return last N messages
+                messages.sort(key=lambda x: x.timestamp)
+                return messages[-limit:]
             else:
                 # Get all messages for project
                 message_recall = MemoryRecall(
@@ -415,8 +491,12 @@ class ChatProcessor(BaseService):
                     try:
                         message_data = memory['value']
                         if isinstance(message_data, dict):
+                            # Handle missing session_id for legacy messages
+                            if 'session_id' not in message_data:
+                                message_data['session_id'] = None
                             message = ChatMessage(**message_data)
-                            messages.append(message)
+                            if session_id is None or message.session_id == session_id:
+                                messages.append(message)
                     except Exception as e:
                         logger.error(f"Error parsing message from memory: {e}")
                         continue

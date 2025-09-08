@@ -32,16 +32,31 @@ class BaseAIService(ABC):
         formatted_prompt = f"{system_prompt}\n\n"
         
         if context:
-            formatted_prompt += f"Context:\n"
+            # Handle chat history specifically
+            if 'recent_chat_history' in context and context['recent_chat_history']:
+                formatted_prompt += "## Recent Conversation History:\n"
+                for i, msg in enumerate(context['recent_chat_history'], 1):
+                    formatted_prompt += f"Message {i}: {msg['role']} - {msg['content']}\n"
+                formatted_prompt += "\n"
+            
+            # Handle other context types
             if 'project_history' in context:
                 formatted_prompt += f"Project History: {json.dumps(context['project_history'], indent=2)}\n"
-            if 'memories' in context:
-                formatted_prompt += f"Relevant Memories: {json.dumps(context['memories'], indent=2)}\n"
+            if 'relevant_memories' in context:
+                formatted_prompt += f"Relevant Memories: {json.dumps(context['relevant_memories'], indent=2)}\n"
             if 'current_state' in context:
                 formatted_prompt += f"Current State: {json.dumps(context['current_state'], indent=2)}\n"
+            if 'context_analysis' in context:
+                analysis = context['context_analysis']
+                formatted_prompt += f"Context Analysis:\n"
+                formatted_prompt += f"- Context Score: {analysis.get('context_score', 0)}\n"
+                formatted_prompt += f"- Completeness Score: {analysis.get('completeness_score', 0)}\n"
+                formatted_prompt += f"- Confidence Score: {analysis.get('confidence_score', 0)}\n"
+                formatted_prompt += f"- Suggested Actions: {analysis.get('suggested_actions', [])}\n"
             formatted_prompt += "\n"
         
-        formatted_prompt += f"User Request: {user_input}\n\n"
+        formatted_prompt += f"## Current User Request:\n{user_input}\n\n"
+        formatted_prompt += "IMPORTANT: Use the conversation history above to understand the context of the current request. Reference previous messages when relevant.\n\n"
         formatted_prompt += "Please provide your response in the specified JSON format."
         
         return formatted_prompt
