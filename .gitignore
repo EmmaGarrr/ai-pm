@@ -111,3 +111,5 @@ frontend/out/
 
 # Docker
 .dockerignore
+
+AI_DEVELOPER_BEHAVIORAL_PATTERNS_GUIDE.md
