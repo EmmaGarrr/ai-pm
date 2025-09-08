@@ -44,80 +44,163 @@ pytest
 
 This is an AI-powered project management system with real-time collaboration features. The architecture consists of:
 
-### Frontend (Next.js 15 + React 19)
-- **Framework**: Next.js 15 with App Router
+### Frontend (Next.js 15.5.2 + React 19.1.1)
+- **Framework**: Next.js 15.5.2 with App Router
 - **State Management**: React Context with useReducer
-- **UI Components**: Radix UI + Tailwind CSS
+- **UI Components**: Radix UI + Tailwind CSS + Shadcn/ui
 - **Real-time**: WebSocket API for live updates
 - **Testing**: Jest + React Testing Library
+- **Performance**: Code splitting, lazy loading, caching strategies
+- **Accessibility**: Built-in accessibility components
 
-### Backend (FastAPI + Python)
-- **Framework**: FastAPI with async support
-- **Database**: Redis for memory and session management
+### Backend (FastAPI 0.115.5 + Python 3.9)
+- **Framework**: FastAPI 0.115.5 with async support
+- **Database**: Redis 5.2.1 for memory and session management
 - **Real-time**: WebSocket + Socket.io integration
-- **AI Integration**: Gemini AI for intelligent responses
+- **AI Integration**: Google Gemini AI with verification loop
 - **Testing**: Pytest with async support
+- **Logging**: Structured logging with comprehensive error handling
 
 ### Key Services
-- **Memory Service**: Redis-based context management
-- **WebSocket Service**: Real-time communication
-- **Broadcast Service**: Message broadcasting
-- **Status Service**: System health monitoring
-- **AI Service**: Gemini AI integration for dual-output responses
+- **Memory Service**: Redis-based context management with metadata tracking
+- **WebSocket Service**: Socket.io integration with event-driven architecture
+- **Broadcast Service**: Message broadcasting with connection management
+- **Status Service**: System health monitoring with real-time metrics
+- **AI Service**: Gemini AI integration with dual-output responses and confidence scoring
+- **Context Engine**: Advanced context analysis and memory management
+- **Connection Manager**: WebSocket connection lifecycle management
+- **Chat Processor**: Advanced chat processing with verification loop
 
 ## Project Structure
 
 ```
 ai-pm/
-├── ai-pm-backend/                 # Backend application
+├── ai-pm-backend/                 # Backend FastAPI application
 │   ├── app/
 │   │   ├── api/                   # API endpoints
-│   │   │   ├── health.py          # Health check endpoints
-│   │   │   ├── projects.py        # Project management APIs
-│   │   │   ├── memory.py          # Memory management APIs
-│   │   │   ├── chat.py            # Chat functionality
 │   │   │   ├── ai.py              # AI response generation
+│   │   │   ├── chat.py            # Chat functionality
+│   │   │   ├── health.py          # Health check endpoints
+│   │   │   ├── memory.py          # Memory management APIs
+│   │   │   ├── projects.py        # Project management APIs
 │   │   │   └── websocket.py      # WebSocket endpoints
-│   │   ├── services/              # Business logic
-│   │   │   ├── redis_service.py   # Redis memory management
-│   │   │   ├── websocket_service.py # WebSocket handling
-│   │   │   ├── broadcast_service.py # Message broadcasting
-│   │   │   └── status_service.py  # System health monitoring
 │   │   ├── config/                # Configuration
 │   │   │   ├── __init__.py        # Main settings
 │   │   │   └── websocket.py       # WebSocket configuration
+│   │   ├── events/                # Event handling
+│   │   │   ├── __init__.py
+│   │   │   └── websocket_events.py # WebSocket event definitions
 │   │   ├── models/                # Data models
-│   │   │   ├── memory.py          # Memory models
 │   │   │   ├── ai_response.py     # AI response models
+│   │   │   ├── memory.py          # Memory models
 │   │   │   ├── message.py         # Message models
 │   │   │   └── project.py         # Project models
-│   │   ├── utils/                 # Utilities
-│   │   │   ├── logger.py          # Logging utilities
-│   │   │   ├── error_handler.py   # Error handling
-│   │   │   └── websocket_security.py # WebSocket security
 │   │   ├── prompts/               # AI prompt templates
-│   │   └── main.py               # FastAPI app entry point
+│   │   │   ├── ai_pm_system.txt   # Main AI system prompt
+│   │   │   ├── technical_instruction.txt # Technical instruction prompt
+│   │   │   ├── user_explanation.txt # User explanation prompt
+│   │   │   └── verification_prompt.txt # Verification prompt
+│   │   ├── services/              # Business logic
+│   │   │   ├── base_ai_service.py  # Base AI service
+│   │   │   ├── base_service.py    # Base service class
+│   │   │   ├── broadcast_service.py # Message broadcasting
+│   │   │   ├── chat_processor.py  # Advanced chat processing
+│   │   │   ├── connection_manager.py # WebSocket connection management
+│   │   │   ├── context_engine.py  # Context analysis and memory
+│   │   │   ├── gemini_service.py  # Google Gemini AI integration
+│   │   │   ├── redis_service.py   # Redis memory management
+│   │   │   ├── status_service.py  # System health monitoring
+│   │   │   └── websocket_service.py # WebSocket handling
+│   │   ├── utils/                 # Utilities
+│   │   │   ├── error_handler.py   # Error handling
+│   │   │   ├── logger.py          # Logging utilities
+│   │   │   └── websocket_security.py # WebSocket security
+│   │   ├── main.py                # FastAPI app entry point
+│   │   └── settings.py            # Application settings
 │   ├── requirements.txt           # Python dependencies
+│   ├── .env                       # Environment variables
 │   ├── .env.example             # Environment template
+│   ├── backend.log              # Backend logs
 │   └── tests/                   # Backend tests
-├── frontend/                      # Frontend application
+├── frontend/                      # Frontend Next.js application
 │   ├── src/
 │   │   ├── app/                   # Next.js app router
-│   │   │   ├── page.tsx          # Main landing page
-│   │   │   ├── layout.tsx        # Root layout
-│   │   │   └── project/          # Project-specific pages
+│   │   │   ├── globals.css        # Global styles
+│   │   │   ├── layout.tsx          # Root layout
+│   │   │   ├── page.tsx            # Main landing page
+│   │   │   ├── project/            # Project-specific pages
+│   │   │   │   └── [id]/           # Dynamic project pages
+│   │   │   │       └── page.tsx
+│   │   │   └── favicon.ico        # Favicon
 │   │   ├── components/            # React components
-│   │   │   ├── ui/               # UI components (Radix UI)
-│   │   │   └── NotificationCenter.tsx # Notification system
+│   │   │   ├── chat/               # Chat-related components
+│   │   │   │   ├── ConfidenceIndicator.tsx
+│   │   │   │   ├── DualOutputContainer.tsx
+│   │   │   │   ├── MessageActions.tsx
+│   │   │   │   ├── TechnicalInstructionsBox.tsx
+│   │   │   │   ├── TypingIndicator.tsx
+│   │   │   │   └── UserExplanationBox.tsx
+│   │   │   ├── dependency/         # Dependency visualization
+│   │   │   ├── memory/             # Memory management
+│   │   │   ├── session/            # Session management
+│   │   │   ├── status/             # Status monitoring
+│   │   │   ├── ui/                 # UI components (Radix UI + Shadcn/ui)
+│   │   │   │   ├── Accessibility.tsx
+│   │   │   │   ├── NotificationCenter.tsx
+│   │   │   │   ├── ThemeProvider.tsx
+│   │   │   │   └── [50+ UI components]
+│   │   │   ├── chat-history.tsx    # Chat history component
+│   │   │   ├── chat-interface.tsx  # Chat interface
+│   │   │   ├── chat-message.tsx    # Chat message component
+│   │   │   ├── context-sidebar.tsx  # Context sidebar
+│   │   │   ├── create-project-dialog.tsx # Project creation dialog
+│   │   │   ├── error-boundary.tsx   # Error boundary
+│   │   │   ├── header.tsx           # Header component
+│   │   │   ├── project-card.tsx     # Project card
+│   │   │   └── sidebar.tsx          # Sidebar
+│   │   ├── hooks/                 # Custom React hooks
 │   │   ├── lib/                   # Utilities and services
-│   │   │   ├── websocket-client.js # WebSocket client
-│   │   │   └── api-client.js      # API client
-│   │   └── store/                 # State management
-│   ├── package.json              # Node.js dependencies
-│   ├── .env.local               # Frontend environment variables
-│   ├── jest.config.js           # Jest configuration
-│   └── tests/                   # Frontend tests
-└── README.md                    # Project documentation
+│   │   │   ├── api/                # API client
+│   │   │   │   ├── authService.ts
+│   │   │   │   ├── chatService.ts
+│   │   │   │   ├── client.ts
+│   │   │   │   └── projectService.ts
+│   │   │   ├── cache/              # Caching utilities
+│   │   │   │   ├── AdvancedCache.ts
+│   │   │   │   └── cacheManager.ts
+│   │   │   ├── error/              # Error handling
+│   │   │   │   └── errorHandler.ts
+│   │   │   ├── store/              # State management
+│   │   │   │   ├── appContext.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── types/              # TypeScript types
+│   │   │   │   └── index.ts
+│   │   │   ├── utils/              # Utility functions
+│   │   │   │   ├── codeSplitting.ts
+│   │   │   │   ├── OfflineSupport.ts
+│   │   │   │   ├── performance.ts
+│   │   │   │   ├── SystemUtilities.ts
+│   │   │   │   └── utils.ts
+│   │   │   └── websocket/          # WebSocket client
+│   │   │       ├── client.ts
+│   │   │       └── eventHandlers.ts
+│   │   └── __tests__/              # Test files
+│   ├── public/                    # Static assets
+│   ├── package.json               # Node.js dependencies
+│   ├── jest.config.js             # Jest configuration
+│   ├── next.config.ts             # Next.js configuration
+│   ├── tailwind.config.ts         # Tailwind CSS configuration
+│   ├── tsconfig.json              # TypeScript configuration
+│   └── components.json            # Shadcn/ui configuration
+├── .git/                         # Git repository
+├── .claude/                      # Claude configuration
+├── CLAUDE.md                     # Project documentation
+├── README.md                     # General README
+├── PRD.md                        # Product Requirements Document
+├── IMPLEMENTATION_PLAN.md        # Implementation plan
+├── UNIFIED_CHAT_STORAGE_PRD.md  # Unified chat PRD
+├── main-focus                    # Current focus file
+└── .gitignore                    # Git ignore rules
 ```
 
 ## Environment Configuration
@@ -137,22 +220,38 @@ ai-pm/
 ## Key Features
 
 ### Real-time Communication
-- WebSocket-based real-time updates
-- Chat functionality with broadcasting
-- User presence indicators
-- Live project status updates
+- WebSocket-based real-time updates with Socket.io integration
+- Chat functionality with broadcasting and connection management
+- Event-driven architecture with structured event handling
+- User presence indicators and live project status updates
 
 ### AI-Powered Features
-- Dual-output AI responses (user-friendly + technical)
-- Context-aware memory system
-- Intelligent project management suggestions
-- Automated task analysis
+- Dual-output AI responses (user-friendly + technical) with confidence scoring
+- Advanced AI verification loop for response validation
+- Context-aware memory system with metadata tracking
+- Intelligent project management suggestions and automated task analysis
+- Multiple specialized AI prompts for different response types
 
 ### Project Management
 - Full CRUD operations for projects and tasks
-- Team collaboration features
-- Progress tracking and reporting
-- Memory-based context preservation
+- Team collaboration features with session management
+- Progress tracking and reporting with real-time metrics
+- Memory-based context preservation with advanced caching
+- Dependency visualization and project analytics
+
+### Performance & Accessibility
+- Code splitting and lazy loading for optimal performance
+- Advanced caching strategies with cache management
+- Built-in accessibility components and ARIA compliance
+- Offline support and performance monitoring
+- Structured error handling and recovery
+
+### Developer Experience
+- Comprehensive testing coverage (Jest + React Testing Library + Pytest)
+- Structured logging with detailed error tracking
+- Hot reload development environment
+- TypeScript for type safety
+- Modern toolchain with Next.js 15.5.2 and React 19.1.1
 
 ## Development Workflow
 
@@ -168,23 +267,78 @@ ai-pm/
 ## Common Issues
 
 ### Redis Connection
-- Ensure Redis is running before starting backend
-- Check Redis connection settings in .env
+- Ensure Redis 5.2.1 is running before starting backend
+- Check Redis connection settings in .env (REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_PASSWORD)
 - Use `redis-cli ping` to verify Redis is running
+- Verify Redis memory limits and connection pooling settings
 
 ### WebSocket Connections
 - Verify backend is running on correct port (8000)
-- Check CORS settings in backend .env
-- Ensure WebSocket URL in frontend .env.local is correct
+- Check CORS settings in backend .env (CORS_ORIGINS)
+- Ensure WebSocket URL in frontend .env.local is correct (NEXT_PUBLIC_WS_URL)
+- Verify Socket.io integration and event handling configuration
 
 ### AI Integration
 - Ensure GEMINI_API_KEY is set in backend .env
-- Verify AI model configuration
+- Verify AI model configuration (GEMINI_MODEL, AI_TEMPERATURE, AI_MAX_TOKENS)
 - Check AI response formatting and dual-output functionality
+- Monitor confidence scoring and verification loop performance
+- Verify prompt templates are correctly configured
+
+### Performance Issues
+- Monitor memory usage and Redis connection limits
+- Check frontend bundle size and code splitting effectiveness
+- Verify caching strategies are working properly
+- Monitor WebSocket connection count and cleanup
+
+### Error Handling
+- Check structured logging in backend.log
+- Verify error boundary components in frontend
+- Monitor API response times and error rates
+- Check WebSocket event handling and reconnection logic
 
 ## Testing Notes
 
-- Frontend tests use Jest with React Testing Library
-- Backend tests use Pytest with async support
-- Integration tests should verify WebSocket connections
-- AI response testing should validate both user-friendly and technical outputs
+### Frontend Testing
+- **Framework**: Jest with React Testing Library
+- **Coverage**: Comprehensive test coverage for all components and utilities
+- **Types**: Unit tests, integration tests, component tests
+- **Features**: 
+  - Component rendering and user interaction testing
+  - State management and context testing
+  - API client and WebSocket integration testing
+  - Accessibility testing with ARIA compliance
+  - Performance and caching utility testing
+- **Commands**: 
+  - `npm test` - Run all tests
+  - `npm run test:watch` - Run tests in watch mode
+  - `npm run test:coverage` - Run tests with coverage report
+
+### Backend Testing
+- **Framework**: Pytest with async support
+- **Coverage**: Comprehensive test coverage for all services and API endpoints
+- **Types**: Unit tests, integration tests, API endpoint tests
+- **Features**:
+  - Service layer testing with Redis integration
+  - API endpoint testing with FastAPI test client
+  - WebSocket event handling testing
+  - AI response generation and verification testing
+  - Error handling and logging testing
+- **Commands**:
+  - `pytest` - Run all tests
+  - `pytest -v` - Run tests with verbose output
+  - `pytest --cov=app` - Run tests with coverage report
+
+### Integration Testing
+- **WebSocket Connections**: Verify real-time communication and event handling
+- **API Integration**: Test frontend-backend API communication
+- **AI Response Testing**: Validate both user-friendly and technical outputs
+- **Memory Management**: Test Redis-based context preservation and retrieval
+- **Error Scenarios**: Test error handling and recovery mechanisms
+- **Performance Testing**: Monitor response times and resource usage
+
+### Test Configuration
+- **Frontend**: jest.config.js with TypeScript and React testing configuration
+- **Backend**: pytest.ini with async support and coverage settings
+- **Environment**: Test-specific environment variables and mock configurations
+- **CI/CD**: Automated testing on code changes with coverage requirements

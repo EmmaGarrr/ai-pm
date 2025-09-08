@@ -51,6 +51,7 @@ class ChatMessage(BaseModel):
     ai_response: Optional[AIResponse] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    session_id: Optional[str] = None
 
 class ChatSession(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))

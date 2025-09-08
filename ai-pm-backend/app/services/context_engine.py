@@ -141,7 +141,7 @@ class ContextEngine(BaseService):
             recall_data = MemoryRecall(
                 project_id=project_id,
                 query="",
-                memory_types=[MessageType.ERROR, MessageType.SOLUTION, MessageType.CONTEXT, MessageType.DEPENDENCY],
+                memory_types=[MessageType.ERROR, MessageType.SOLUTION, MessageType.CONTEXT, MessageType.DEPENDENCY, MessageType.MESSAGE],
                 limit=100
             )
             all_memories = await self.redis_service.recall_memory(recall_data)

@@ -418,6 +418,14 @@ const AppContext = createContext<{
   dispatch: React.Dispatch<AppAction>;
 } | null>(null);
 
+// Helper function to get session ID from URL
+const getSessionIdFromURL = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('session') || urlParams.get('sessionId');
+};
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
@@ -445,34 +453,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // Load current chat session from localStorage
-      const savedChatSession = localStorage.getItem('currentChatSession');
-      if (savedChatSession) {
+      // Load current chat session and messages from backend
+      const initializeChatFromBackend = async () => {
         try {
-          const chatSessionData = JSON.parse(savedChatSession);
-          dispatch({ type: 'SET_CURRENT_SESSION', payload: chatSessionData });
+          const sessionId = getSessionIdFromURL();
+          const projectId = state.currentProject?.id;
           
-          // Load messages for the restored session from localStorage
-          const savedMessages = localStorage.getItem(`chat_messages_${chatSessionData.id}`);
-          if (savedMessages) {
-            try {
-              const parsedMessages = JSON.parse(savedMessages);
-              // Convert date strings back to Date objects
-              const messagesWithDates = parsedMessages.map((msg: any) => ({
-                ...msg,
-                createdAt: new Date(msg.createdAt),
-                updatedAt: new Date(msg.updatedAt),
+          if (sessionId && projectId) {
+            console.log('Initializing chat from backend for session:', sessionId);
+            
+            // Call backend API directly
+            const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/history/${projectId}?session_id=${sessionId}&limit=50`;
+            const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (response.ok) {
+              const messages = await response.json();
+              
+              // Transform backend messages to frontend format
+              const transformedMessages: Message[] = messages.map((msg: any) => ({
+                id: msg.id,
+                sessionId: sessionId,
+                userId: state.user?.id || 'system',
+                content: msg.content,
+                type: msg.role === 'ai_pm' ? MessageType.AI : MessageType.USER,
+                status: MessageStatus.DELIVERED,
+                metadata: {
+                  confidence: msg.ai_response?.confidence,
+                  processingTime: msg.ai_response?.metadata?.processing_time,
+                  instructions: msg.ai_response?.technical_instruction,
+                  summary: msg.ai_response?.user_explanation,
+                  model: msg.ai_response?.metadata?.model_info?.model_name,
+                  verificationRequired: (msg.ai_response?.confidence || 1) < 0.7,
+                },
+                aiResponse: msg.ai_response ? {
+                  userExplanation: msg.ai_response.user_explanation,
+                  technicalInstructions: msg.ai_response.technical_instruction,
+                  confidence: msg.ai_response.confidence,
+                  metadata: msg.ai_response.metadata
+                } : undefined,
+                createdAt: new Date(msg.timestamp),
+                updatedAt: new Date(msg.timestamp),
+                isEdited: false,
+                reactions: [],
               }));
-              dispatch({ type: 'SET_MESSAGES', payload: messagesWithDates });
-              console.log('Restored messages from localStorage:', messagesWithDates.length);
-            } catch (error) {
-              console.error('Failed to parse saved messages:', error);
+              
+              dispatch({ type: 'SET_MESSAGES', payload: transformedMessages });
+              console.log('Loaded messages from backend:', transformedMessages.length);
             }
           }
         } catch (error) {
-          console.error('Failed to parse saved chat session:', error);
+          console.error('Failed to initialize chat from backend:', error);
         }
-      }
+      };
+
+      // Initialize chat state from backend
+      initializeChatFromBackend();
     }
   }, []);
 
@@ -499,22 +539,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state.session]);
 
-  // Save current chat session to localStorage when it changes
+  // Current chat session is managed by backend, no localStorage needed
   useEffect(() => {
-    if (typeof window !== 'undefined' && state.currentSession) {
-      localStorage.setItem('currentChatSession', JSON.stringify(state.currentSession));
-    } else if (typeof window !== 'undefined') {
-      localStorage.removeItem('currentChatSession');
+    if (state.currentSession) {
+      console.log('Session updated:', state.currentSession.id);
     }
   }, [state.currentSession]);
 
-  // Save messages to localStorage when they change
+  // Messages are managed by backend, no localStorage needed
   useEffect(() => {
-    if (typeof window !== 'undefined' && state.currentSession && state.messages.length > 0) {
-      const messageKey = `chat_messages_${state.currentSession.id}`;
-      localStorage.setItem(messageKey, JSON.stringify(state.messages));
+    if (state.messages.length > 0) {
+      console.log('Messages updated, count:', state.messages.length);
     }
-  }, [state.messages, state.currentSession]);
+  }, [state.messages]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
@@ -794,23 +831,10 @@ export function useChatStore() {
           reactions: [],
         }));
         
-        // If backend returns empty messages, try to load from localStorage as fallback
-        if (transformedMessages.length === 0 && typeof window !== 'undefined') {
-          const savedMessages = localStorage.getItem(`chat_messages_${sessionId}`);
-          if (savedMessages) {
-            try {
-              const parsedMessages = JSON.parse(savedMessages);
-              // Convert date strings back to Date objects
-              transformedMessages = parsedMessages.map((msg: any) => ({
-                ...msg,
-                createdAt: new Date(msg.createdAt),
-                updatedAt: new Date(msg.updatedAt),
-              }));
-              console.log('Loaded messages from localStorage fallback:', transformedMessages.length);
-            } catch (error) {
-              console.error('Failed to parse saved messages:', error);
-            }
-          }
+        // If backend returns empty messages, that's the authoritative state
+        if (transformedMessages.length === 0) {
+          console.log('No messages found for session:', sessionId);
+          // No fallback to localStorage - backend is authoritative
         }
         
         dispatch({ type: 'SET_MESSAGES', payload: transformedMessages });
@@ -1050,6 +1074,53 @@ export function useChatStore() {
           setTimeout(() => {
             dispatch({ type: 'SET_AI_PROCESSING_STAGE', payload: 'idle' });
           }, 1500);
+          
+          // Refresh messages from backend to get the authoritative state
+          console.log('Refreshing messages from backend after sending...');
+          
+          // Call backend API directly to refresh messages
+          const refreshUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/history/${currentProjectId}?session_id=${currentSessionId}&limit=50`;
+          const refreshResponse = await fetch(refreshUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (refreshResponse.ok) {
+            const refreshedMessages = await refreshResponse.json();
+            
+            // Transform backend messages to frontend format
+            const transformedRefreshedMessages: Message[] = refreshedMessages.map((msg: any) => ({
+              id: msg.id,
+              sessionId: currentSessionId,
+              userId: state.user?.id || 'system',
+              content: msg.content,
+              type: msg.role === 'ai_pm' ? MessageType.AI : MessageType.USER,
+              status: MessageStatus.DELIVERED,
+              metadata: {
+                confidence: msg.ai_response?.confidence,
+                processingTime: msg.ai_response?.metadata?.processing_time,
+                instructions: msg.ai_response?.technical_instruction,
+                summary: msg.ai_response?.user_explanation,
+                model: msg.ai_response?.metadata?.model_info?.model_name,
+                verificationRequired: (msg.ai_response?.confidence || 1) < 0.7,
+              },
+              aiResponse: msg.ai_response ? {
+                userExplanation: msg.ai_response.user_explanation,
+                technicalInstructions: msg.ai_response.technical_instruction,
+                confidence: msg.ai_response.confidence,
+                metadata: msg.ai_response.metadata
+              } : undefined,
+              createdAt: new Date(msg.timestamp),
+              updatedAt: new Date(msg.timestamp),
+              isEdited: false,
+              reactions: [],
+            }));
+            
+            dispatch({ type: 'SET_MESSAGES', payload: transformedRefreshedMessages });
+            console.log('Refreshed messages from backend:', transformedRefreshedMessages.length);
+          }
         }
         
         return data;
