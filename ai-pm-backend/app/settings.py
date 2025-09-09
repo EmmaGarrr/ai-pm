@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # AI Configuration
     gemini_api_key: Optional[str] = None
-    gemini_model: str = "gemini-2.0-flash-001"
+    gemini_model: str = "gemini-2.5-pro"
     ai_temperature: float = 0.3
     ai_max_tokens: int = 2000
     

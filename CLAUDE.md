@@ -69,7 +69,7 @@ This is an AI-powered project management system with real-time collaboration fea
 - **AI Service**: Gemini AI integration with dual-output responses and confidence scoring
 - **Context Engine**: Advanced context analysis and memory management
 - **Connection Manager**: WebSocket connection lifecycle management
-- **Chat Processor**: Advanced chat processing with verification loop
+- **Chat Processor**: Advanced chat processing with verification loop and adaptive workflow management
 
 ## Project Structure
 
@@ -231,6 +231,8 @@ ai-pm/
 - Context-aware memory system with metadata tracking
 - Intelligent project management suggestions and automated task analysis
 - Multiple specialized AI prompts for different response types
+- Adaptive workflow management for multi-cycle analysis with progressive depth tracking
+- Workflow state persistence using Redis infrastructure with 30-day TTL
 
 ### Project Management
 - Full CRUD operations for projects and tasks
@@ -284,6 +286,8 @@ ai-pm/
 - Check AI response formatting and dual-output functionality
 - Monitor confidence scoring and verification loop performance
 - Verify prompt templates are correctly configured
+- Test adaptive workflow management with progressive analysis depth (0-4 levels)
+- Verify workflow state persistence and advancement logic
 
 ### Performance Issues
 - Monitor memory usage and Redis connection limits
@@ -324,6 +328,7 @@ ai-pm/
   - WebSocket event handling testing
   - AI response generation and verification testing
   - Error handling and logging testing
+  - Adaptive workflow management testing with state persistence validation
 - **Commands**:
   - `pytest` - Run all tests
   - `pytest -v` - Run tests with verbose output
